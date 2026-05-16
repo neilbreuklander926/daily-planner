@@ -311,11 +311,15 @@ select.wb-sel option{background:#1D4A72;color:#fff}
 .att-img-preview{width:52px;height:52px;object-fit:cover;border-radius:5px;border:1px solid var(--bd);flex-shrink:0;background:var(--bgp)}
 .att-img-name{font-size:11px;color:var(--t2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .det-body{position:relative}
-.det-body.det-drop-active{outline:3px dashed #0078D4;outline-offset:-3px;background:rgba(0,120,212,.06)}
+.det-body.det-drop-active{outline:1.5px dashed #0078D4;outline-offset:-2px;background:rgba(0,120,212,.06)}
 .det-body.det-drop-active::after{content:'Drop files here to attach';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:15px;font-weight:600;color:#0078D4;pointer-events:none;background:rgba(255,255,255,.9);padding:10px 18px;border-radius:8px;white-space:nowrap}
 .day-files-body{position:relative;min-height:60px}
-.day-files-body.det-drop-active{outline:3px dashed #0078D4;outline-offset:-3px;background:rgba(0,120,212,.06)}
+.day-files-body.det-drop-active{outline:1.5px dashed #0078D4;outline-offset:-2px;background:rgba(0,120,212,.06)}
 .day-files-body.det-drop-active::after{content:'Drop files here to attach';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:13px;font-weight:600;color:#0078D4;pointer-events:none;background:rgba(255,255,255,.9);padding:8px 14px;border-radius:8px;white-space:nowrap}
+
+#img-lightbox.open{display:flex}
+.att-img-preview{width:72px;height:72px;object-fit:cover;border-radius:6px;border:1px solid var(--bd);flex-shrink:0;background:var(--bgp);cursor:pointer;transition:opacity .12s}
+.att-img-preview:hover{opacity:.85}
 </style>
 </head>
 <body>
@@ -1310,7 +1314,7 @@ function renderWBSection(){
     +' ondragleave="if(!this.contains(event.relatedTarget))this.classList.remove(\'det-drop-active\')"'
     +' ondragover="event.preventDefault()"'
     +' ondrop="handleDayFileDrop(event)">'
-    +'<div class="drop-zone-hint">&#8659; Drop files or photos here</div>'
+    
     +'<button class="att-add-btn" id="day-add-file-btn">&#128206; Add File</button>'
     +'<button class="att-add-btn" style="margin-top:4px" id="day-add-img-btn">&#128247; Add Image / Photo</button>'
     +'</div></div>';
@@ -2253,7 +2257,7 @@ async function renderDayFiles(date){
     if(a.type==='image'){
       parts.push('<div class="att-img-row" data-att-id="'+a.id+'" data-att-path="'+sp+'">'
         +'<div class="att-img-thumb-wrap"><img class="att-img-preview" src="" data-path="'+sp+'" alt="'+esc(a.name)+'">'
-        +'<div class="att-img-name">'+esc(a.name)+'</div></div>'
+        +'</div>'
         +'<button class="att-del" data-del-id="'+a.id+'" data-del-path="'+sp+'">&#x00D7;</button></div>');
     }else{
       parts.push('<div class="att-row"><span style="font-size:13px">&#128196;</span>'
@@ -2268,7 +2272,7 @@ async function renderDayFiles(date){
     var url=await getAttachmentUrl(img.dataset.path);if(url)img.src=url;
   });
   el.querySelectorAll('.att-img-thumb-wrap').forEach(function(wrap){
-    wrap.addEventListener('click',function(){var row=wrap.closest('[data-att-id]');if(row)openAtt(row.dataset.attId,row.dataset.attPath);});
+    wrap.addEventListener('click',function(){var img=wrap.querySelector('.att-img-preview');if(img&&img.dataset.path)openLightbox(img.dataset.path);});
   });
   el.querySelectorAll('.att-name').forEach(function(span){
     span.addEventListener('click',function(){openAtt(span.dataset.attId,span.dataset.attPath);});
@@ -2329,7 +2333,7 @@ async function renderTaskAttachments(taskId){
     if(a.type==='image'){
       parts.push('<div class="att-img-row" data-att-id="'+a.id+'" data-att-path="'+sp+'">'
         +'<div class="att-img-thumb-wrap"><img class="att-img-preview" src="" data-path="'+sp+'" alt="'+esc(a.name)+'">'
-        +'<div class="att-img-name">'+esc(a.name)+'</div></div>'
+        +'</div>'
         +'<button class="att-del" data-del-id="'+a.id+'" data-del-path="'+sp+'">&#x00D7;</button></div>');
     }else{
       parts.push('<div class="att-row"><span style="font-size:13px">&#128196;</span>'
@@ -2342,7 +2346,7 @@ async function renderTaskAttachments(taskId){
     var url=await getAttachmentUrl(img.dataset.path);if(url)img.src=url;
   });
   el.querySelectorAll('.att-img-thumb-wrap').forEach(function(wrap){
-    wrap.addEventListener('click',function(){var row=wrap.closest('[data-att-id]');if(row)openAtt(row.dataset.attId,row.dataset.attPath);});
+    wrap.addEventListener('click',function(){var img=wrap.querySelector('.att-img-preview');if(img&&img.dataset.path)openLightbox(img.dataset.path);});
   });
   el.querySelectorAll('.att-name').forEach(function(span){
     span.addEventListener('click',function(){openAtt(span.dataset.attId,span.dataset.attPath);});
@@ -2480,7 +2484,7 @@ function _buildDetailsWithAttachments(){
         '<div class="det-label">Attachments</div>'+
         '<div id="task-atts-'+t.id+'"><div style="font-size:12px;color:#95A8B8">Loading\u2026</div></div>'+
         '<div class="task-att-drop" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ondrop="handleTaskFileDrop(event,\''+t.id+'\')">'
-        +'<div class="drop-zone-hint">&#8659; Drop files or photos here</div>'
+        
         +'<button class="att-add-btn" style="margin-top:2px" onclick="taskAddFile(\''+t.id+'\')" >&#128206; Add File</button>'
         +'<button class="att-add-btn" style="margin-top:4px" onclick="taskAddImage(\''+t.id+'\')" >&#128247; Add Image / Photo</button>'
         +'</div>';
@@ -2534,5 +2538,11 @@ window.handleTaskFileDrop=async function(e,taskId){
   renderTaskAttachments(taskId);
 }
 </script>
+
+<!-- Image lightbox -->
+<div id="img-lightbox" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.92);align-items:center;justify-content:center;cursor:pointer" onclick="closeLightbox()">
+  <img id="img-lightbox-img" src="" style="max-width:92vw;max-height:92vh;object-fit:contain;border-radius:8px;box-shadow:0 8px 60px rgba(0,0,0,.6)">
+  <button onclick="closeLightbox()" style="position:absolute;top:16px;right:20px;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:24px;cursor:pointer;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center">&times;</button>
+</div>
 </body>
 </html>
