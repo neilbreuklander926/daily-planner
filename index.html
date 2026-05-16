@@ -2430,8 +2430,11 @@ function _buildDetailsWithAttachments(){
       html+='<div class="det-sep"></div>'+
         '<div class="det-label">Attachments</div>'+
         '<div id="task-atts-'+t.id+'"><div style="font-size:12px;color:#95A8B8">Loading\u2026</div></div>'+
-        '<button class="att-add-btn" style="margin-top:6px" onclick="taskAddFile(\''+t.id+'\')">&#128206; Add File</button>'+
-        '<button class="att-add-btn" style="margin-top:4px" onclick="taskAddImage(\''+t.id+'\')">&#128247; Add Image</button>';
+        '<div class="task-att-drop" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ondrop="handleTaskFileDrop(event,\''+t.id+'\')">'
+        +'<div class="drop-zone-hint">&#8659; Drop files or photos here</div>'
+        +'<button class="att-add-btn" style="margin-top:2px" onclick="taskAddFile(\''+t.id+'\')" >&#128206; Add File</button>'
+        +'<button class="att-add-btn" style="margin-top:4px" onclick="taskAddImage(\''+t.id+'\')" >&#128247; Add Image / Photo</button>'
+        +'</div>';
     }
     html+='</div>';
     return html;
