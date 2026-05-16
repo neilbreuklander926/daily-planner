@@ -1320,7 +1320,7 @@ function renderApp(){
         <button class="nbtn nbtn-wk" onclick="nextWeek()" title="Next week">&#187;</button>
         ${!tw?`<button class="tbtn" onclick="goToday()">Today</button>`:''}
       </div>
-      <div style="display:flex;align-items:center;gap:6px"><button id="undo-btn" class="ur-btn" onclick="undo()" disabled title="Undo (Ctrl+Z)">&#8617;</button><button id="redo-btn" class="ur-btn" onclick="redo()" disabled title="Redo (Ctrl+Y)">&#8618;</button><div id="sst" class="sst sav">\u2713 Saved</div></div>
+      <div style="display:flex;align-items:center;gap:6px"><button id="undo-btn" class="ur-btn" onclick="undo()" disabled title="Undo (Ctrl+Z)">&#8617;</button><button id="redo-btn" class="ur-btn" onclick="redo()" disabled title="Redo (Ctrl+Y)">&#8618;</button><div id="sst" class="sst sav">\u2713 Saved<div class="user-area"><button class="db-open-btn" onclick="openDB()">&#128451; Library</button><button onclick="doSignOut()" style="font-size:12px;padding:4px 9px;border:1px solid #DDE3E9;border-radius:6px;background:none;cursor:pointer;color:#4F6A80">Sign out</button></div></div></div>
     </div>
     <div class="cols">
       <div class="left">${renderCalendar()}${renderDayTabs()}${renderWBSection()}</div>
