@@ -403,9 +403,21 @@ select.wb-sel option{background:#1D4A72;color:#fff}
 <div id="wb-overlay">
   <div id="wb-topbar">
     <button id="wb-back">&#8592; Back to Planner</button>
-    <span id="wb-daytitle"></span>
+    <span id="wb-daytitle" style="font-family:'Lora',serif;font-style:italic;font-size:14px"></span>
+    <input id="wb-name-inp" type="text" placeholder="Whiteboard name (optional)"
+      style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:5px;color:#fff;font-size:13px;padding:4px 10px;outline:none;width:200px;font-family:inherit"
+      onfocus="this.style.background='rgba(255,255,255,.2)'" onblur="this.style.background='rgba(255,255,255,.12)';saveWBName(this.value)"
+      onkeydown="if(event.key==='Enter')this.blur()">
     <span style="flex:1"></span>
-    <span style="font-size:11px;color:rgba(255,255,255,.4)">Ctrl+Z undo &bull; Ctrl+Y redo &bull; Auto-saves on exit</span>
+    <span style="font-size:11px;color:rgba(255,255,255,.35)">Background:</span>
+    <button class="wb-bg-btn" id="wb-bg-blank" onclick="setWBBg('blank')" title="Blank" style="width:28px;height:28px;border-radius:4px;border:1.5px solid rgba(255,255,255,.3);background:#fff;cursor:pointer"></button>
+    <button class="wb-bg-btn" id="wb-bg-grid" onclick="setWBBg('grid')" title="Grid" style="width:28px;height:28px;border-radius:4px;border:1.5px solid rgba(255,255,255,.3);background:transparent;cursor:pointer;position:relative;overflow:hidden">
+      <svg viewBox="0 0 28 28" style="position:absolute;inset:0;width:100%;height:100%"><line x1="7" y1="0" x2="7" y2="28" stroke="rgba(0,100,212,.6)" stroke-width="0.8"/><line x1="14" y1="0" x2="14" y2="28" stroke="rgba(0,100,212,.6)" stroke-width="0.8"/><line x1="21" y1="0" x2="21" y2="28" stroke="rgba(0,100,212,.6)" stroke-width="0.8"/><line x1="0" y1="7" x2="28" y2="7" stroke="rgba(0,100,212,.6)" stroke-width="0.8"/><line x1="0" y1="14" x2="28" y2="14" stroke="rgba(0,100,212,.6)" stroke-width="0.8"/><line x1="0" y1="21" x2="28" y2="21" stroke="rgba(0,100,212,.6)" stroke-width="0.8"/></svg>
+    </button>
+    <button class="wb-bg-btn" id="wb-bg-dots" onclick="setWBBg('dots')" title="Dots" style="width:28px;height:28px;border-radius:4px;border:1.5px solid rgba(255,255,255,.3);background:transparent;cursor:pointer;position:relative;overflow:hidden">
+      <svg viewBox="0 0 28 28" style="position:absolute;inset:0;width:100%;height:100%"><circle cx="7" cy="7" r="1.2" fill="rgba(0,100,212,.7)"/><circle cx="14" cy="7" r="1.2" fill="rgba(0,100,212,.7)"/><circle cx="21" cy="7" r="1.2" fill="rgba(0,100,212,.7)"/><circle cx="7" cy="14" r="1.2" fill="rgba(0,100,212,.7)"/><circle cx="14" cy="14" r="1.2" fill="rgba(0,100,212,.7)"/><circle cx="21" cy="14" r="1.2" fill="rgba(0,100,212,.7)"/><circle cx="7" cy="21" r="1.2" fill="rgba(0,100,212,.7)"/><circle cx="14" cy="21" r="1.2" fill="rgba(0,100,212,.7)"/><circle cx="21" cy="21" r="1.2" fill="rgba(0,100,212,.7)"/></svg>
+    </button>
+    <span style="font-size:11px;color:rgba(255,255,255,.35);margin-left:6px">Ctrl+Z undo</span>
   </div>
   <div id="wb-toolbar"></div>
   <div id="wb-shape-dd"></div>
@@ -725,8 +737,7 @@ const WB={
   strokes:[],history:[],undone:[],
   canvas:null,ctx:null,
   isDrawing:false,sx:0,sy:0,pts:[],
-  dayKey:null,textInput:null,
-  shapeDdOpen:false,
+  dayKey:null,textInput:null,bg:'blank',name:'',shapeDdOpen:false,
 };
 const SHAPE_FILL_COLORS=['none','#fff','#D6E8F8','#DFF6DD','#FCEBD9','#FEF6D9','#FDE7E9','#EDE0F4','#FDDFF4'];
 const SHAPES=[
@@ -751,7 +762,7 @@ function wbGetPos(e){
 function wbRedraw(){
   const{canvas:cv,ctx}=WB;if(!ctx)return;
   ctx.clearRect(0,0,cv.width,cv.height);
-  ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width,cv.height);
+  wbDrawBackground(ctx,cv.width,cv.height);
   WB.strokes.forEach(s=>wbDraw(ctx,s));
 }
 function wbDraw(ctx,s){
@@ -977,8 +988,11 @@ function wbExists(d){return!!localStorage.getItem(getWbKey(d));}
 function openWhiteboard(){
   const d=addDays(monday,activeDay);
   WB.dayKey=getWbKey(d);
+  var savedName=localStorage.getItem(WB.dayKey+'_name')||'';
+  WB.name=savedName;
+  WB.bg=localStorage.getItem(WB.dayKey+'_bg')||'blank';
   document.getElementById('wb-overlay').classList.add('open');
-  document.getElementById('wb-daytitle').textContent=`${DL[activeDay]}, ${fmt(d)}`;
+  renderWBTopbar(d);
   renderWBToolbar();
   const wrap=document.getElementById('wb-canvas-wrap');
   wrap.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#aaa;font-size:14px;background:#fff">Initializing whiteboard\u2026</div>';
@@ -999,6 +1013,8 @@ function openWhiteboard(){
 function closeWhiteboard(){
   document.getElementById('wb-overlay').classList.remove('open');
   WB.shapeDdOpen=false;
+  if(WB.name)localStorage.setItem(WB.dayKey+'_name',WB.name);
+  if(WB.bg)localStorage.setItem(WB.dayKey+'_bg',WB.bg);
   if(WB.dayKey){
     if(WB.strokes.length){
       localStorage.setItem(WB.dayKey,JSON.stringify(WB.strokes));
@@ -1018,11 +1034,14 @@ function closeWhiteboard(){
   const leftEl=document.querySelector('.left');
   if(leftEl)leftEl.innerHTML=renderCalendar()+renderDayTabs()+renderWBSection();
 }
-window.wbDeleteSaved=function(e){
+window.wbDeleteSaved=async function(e){
   if(e)e.stopPropagation();
   if(confirm('Delete this whiteboard?')){
-    localStorage.removeItem(getWbKey(addDays(monday,activeDay)));
-    const l=document.querySelector('.left');if(l)l.innerHTML=renderCalendar()+renderDayTabs()+renderWBSection();
+    var d=addDays(monday,activeDay);
+    var key=getWbKey(d);
+    localStorage.removeItem(key);
+    if(currentUser) await sbDeleteWhiteboard(d.toISOString().slice(0,10));
+    var l=document.querySelector('.left');if(l)l.innerHTML=renderCalendar()+renderDayTabs()+renderWBSection();
   }
 };
 window.addEventListener('resize',()=>{
@@ -2290,13 +2309,13 @@ async function renderDayFiles(date){
   // Drag-to-transfer (day → task)
   el.querySelectorAll('[draggable="true"]').forEach(function(row){
     row.addEventListener('dragstart',function(e){
-      e.dataTransfer.setData('att-id',row.dataset.attId);
-      e.dataTransfer.setData('att-path',row.dataset.attPath);
-      e.dataTransfer.setData('att-type',row.dataset.attType||'file');
-      e.dataTransfer.setData('att-name',row.dataset.attName||'');
-      e.dataTransfer.setData('att-source','day');
+      _draggingAtt={id:row.dataset.attId,path:row.dataset.attPath,type:row.dataset.attType||'file',name:row.dataset.attName||'',source:'day',taskId:null};
       e.dataTransfer.effectAllowed='move';
+      e.dataTransfer.setData('text/plain','att-transfer'); // needed for FF
     });
+    row.addEventListener('dragend',function(){_draggingAtt=null;});
+    // Prevent inner image from hijacking drag
+    var img=row.querySelector('img');if(img)img.setAttribute('draggable','false');
   });
   var fab=document.getElementById('day-add-file-btn'),iab=document.getElementById('day-add-img-btn');
   if(fab)fab.addEventListener('click',function(){triggerFileUpload('file',null);});
@@ -2375,14 +2394,12 @@ async function renderTaskAttachments(taskId){
   // Drag-to-transfer (task → day)
   el.querySelectorAll('[draggable="true"]').forEach(function(row){
     row.addEventListener('dragstart',function(e){
-      e.dataTransfer.setData('att-id',row.dataset.attId);
-      e.dataTransfer.setData('att-path',row.dataset.attPath);
-      e.dataTransfer.setData('att-type',row.dataset.attType||'file');
-      e.dataTransfer.setData('att-name',row.dataset.attName||'');
-      e.dataTransfer.setData('att-source','task');
-      e.dataTransfer.setData('att-task-id',taskId);
+      _draggingAtt={id:row.dataset.attId,path:row.dataset.attPath,type:row.dataset.attType||'file',name:row.dataset.attName||'',source:'task',taskId:taskId};
       e.dataTransfer.effectAllowed='move';
+      e.dataTransfer.setData('text/plain','att-transfer');
     });
+    row.addEventListener('dragend',function(){_draggingAtt=null;});
+    var img=row.querySelector('img');if(img)img.setAttribute('draggable','false');
   });
 }
 
@@ -2546,13 +2563,9 @@ window.handleDayFileDrop=async function(e){
   e.preventDefault();e.stopPropagation();
   var el=document.getElementById('day-files-body');
   if(el)el.classList.remove('det-drop-active');
-  var src=e.dataTransfer&&e.dataTransfer.getData('att-source');
-  if(src==='task'){
-    // Transfer from task to day
-    var attId=e.dataTransfer.getData('att-id');
-    var fromTask=e.dataTransfer.getData('att-task-id');
-    await transferAttachment(attId,'task',fromTask,null);
-    return;
+  if(_draggingAtt&&_draggingAtt.source==='task'){
+    await transferAttachment(_draggingAtt.id,'task',_draggingAtt.taskId,null);
+    _draggingAtt=null;return;
   }
   var files=e.dataTransfer&&e.dataTransfer.files;
   if(!files||!files.length)return;
@@ -2589,11 +2602,9 @@ window.handleTaskFileDrop=async function(e,taskId){
   if(!detailsTaskId)return;
   e.preventDefault();e.stopPropagation();
   var el=e.currentTarget;if(el)el.classList.remove('det-drop-active');
-  var src=e.dataTransfer&&e.dataTransfer.getData('att-source');
-  if(src==='day'){
-    var attId=e.dataTransfer.getData('att-id');
-    await transferAttachment(attId,'day',null,detailsTaskId);
-    return;
+  if(_draggingAtt&&_draggingAtt.source==='day'){
+    await transferAttachment(_draggingAtt.id,'day',null,detailsTaskId);
+    _draggingAtt=null;return;
   }
   var files=e.dataTransfer&&e.dataTransfer.files;
   if(!files||!files.length)return;
