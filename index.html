@@ -312,12 +312,12 @@ select.wb-sel option{background:#1D4A72;color:#fff}
 .att-img-name{font-size:11px;color:var(--t2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .det-body{position:relative}
 .det-body.det-drop-active{outline:1.5px dashed #0078D4;outline-offset:-2px;background:rgba(0,120,212,.05)}
-.det-drop-overlay{display:none;position:absolute;inset:0;background:rgba(0,120,212,.08);border:1.5px dashed #0078D4;border-radius:8px;z-index:50;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:#0078D4;pointer-events:none}
+.det-drop-overlay,.day-drop-overlay{display:none;position:absolute;inset:0;background:rgba(235,245,255,.92);border:2px dashed #0078D4;border-radius:8px;z-index:50;flex-direction:column;align-items:center;justify-content:center;gap:8px;pointer-events:none}
 .det-body.det-drop-active .det-drop-overlay{display:flex}
-.day-files-body{position:relative;min-height:60px}
-.day-files-body.det-drop-active{outline:1.5px dashed #0078D4;outline-offset:-2px;background:rgba(0,120,212,.05)}
+.day-files-body{position:relative;min-height:80px}
 .day-files-body.det-drop-active .day-drop-overlay{display:flex}
-.day-drop-overlay{display:none;position:absolute;inset:0;background:rgba(0,120,212,.08);border:1.5px dashed #0078D4;border-radius:8px;z-index:50;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#0078D4;pointer-events:none}
+.drop-ov-icon{font-size:30px;line-height:1;color:#0078D4}
+.drop-ov-text{font-size:13px;font-weight:600;color:#0078D4}
 
 #img-lightbox.open{display:flex}
 .att-img-preview{width:72px;height:72px;object-fit:cover;border-radius:6px;border:1px solid var(--bd);flex-shrink:0;background:var(--bgp);cursor:pointer;transition:opacity .12s}
@@ -2286,7 +2286,7 @@ async function renderDayFiles(date){
         +'<button class="att-del" data-del-id="'+a.id+'" data-del-path="'+sp+'">&#x00D7;</button></div>');
     }
   }
-  parts.unshift('<div class="day-drop-overlay">Drop files here to attach</div>');
+  parts.unshift('<div class="day-drop-overlay"><div class="drop-ov-icon">&#8679;</div><div class="drop-ov-text">Drop files here to attach</div></div>');
   parts.push('<button class="att-add-btn" id="day-add-file-btn">&#128206; Add File</button>');
   parts.push('<button class="att-add-btn" style="margin-top:4px" id="day-add-img-btn">&#128247; Add Image / Photo</button>');
   el.innerHTML=parts.join('');
@@ -2515,7 +2515,7 @@ function _buildDetailsWithAttachments(){
     var html='<div class="det-hdr" style="background:'+col.acc+'">'+
       '<span class="det-hdr-title">Task Details</span>'+
       '<button class="det-close" onclick="closeDetails()" title="Back to Notes">&times;</button>'+
-      '</div><div class="det-body"><div class="det-drop-overlay">Drop files here to attach</div>'+
+      '</div><div class="det-body"><div class="det-drop-overlay"><div class="drop-ov-icon">&#8679;</div><div class="drop-ov-text">Drop files here to attach</div></div>'+
       '<div class="det-label">Task</div>'+
       '<div class="det-task-title">'+esc(t.text)||'<em style="opacity:.5">Untitled task</em>'+'</div>'+
       '<div class="det-time">&#128337; '+timeStr+'</div>'+
@@ -2538,26 +2538,6 @@ function _buildDetailsWithAttachments(){
 }
 
 
-
-// Initialize auth on page load
-_buildDetailsWithAttachments();
-(async function(){
-  try{
-    await initAuth();
-  }catch(err){
-    console.error('Auth init error:',err);
-    // Show auth screen anyway so user isn't stuck
-    var as=document.getElementById('auth-screen');
-    var ar=document.getElementById('app-root');
-    if(as)as.style.display='flex';
-    if(ar)ar.style.display='none';
-    var errEl=document.getElementById('auth-err');
-    if(errEl){
-      errEl.textContent='Connection error: '+err.message+'. Check console.';
-      errEl.style.display='block';
-    }
-  }
-})();
 
 window.handleDayFileDrop=async function(e){
   e.preventDefault();e.stopPropagation();
@@ -2590,15 +2570,8 @@ window.handleTaskFileDrop=async function(e,taskId){
   for(var i=0;i<files.length;i++) await uploadAttachment(files[i],date,taskId);
   renderTaskAttachments(taskId);
 }
-</script>
 
-<!-- Image lightbox -->
-<div id="img-lightbox" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.92);align-items:center;justify-content:center;cursor:pointer" onclick="closeLightbox()">
-  <img id="img-lightbox-img" src="" style="max-width:92vw;max-height:92vh;object-fit:contain;border-radius:8px;box-shadow:0 8px 60px rgba(0,0,0,.6)">
-  <button onclick="closeLightbox()" style="position:absolute;top:16px;right:20px;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:24px;cursor:pointer;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center">&times;</button>
-</div>
-</body>
-</htmlwindow.detBodyDrop=async function(e){
+window.detBodyDrop=async function(e){
   if(!detailsTaskId)return;
   e.preventDefault();e.stopPropagation();
   var el=e.currentTarget;if(el)el.classList.remove('det-drop-active');
@@ -2612,4 +2585,132 @@ window.handleTaskFileDrop=async function(e,taskId){
   var date=addDays(monday,activeDay);
   for(var i=0;i<files.length;i++) await uploadAttachment(files[i],date,detailsTaskId);
   renderTaskAttachments(detailsTaskId);
-}>
+};
+
+async function transferAttachment(attId,fromSource,fromTaskId,toTaskId){
+  if(!currentUser)return;
+  var sb=getSB();
+  var newTaskId=toTaskId||null;
+  var res=await sb.from('attachments').update({task_id:newTaskId}).eq('id',attId).eq('user_id',currentUser.id);
+  var date=addDays(monday,activeDay);
+  renderDayFiles(date);
+  if(detailsTaskId)renderTaskAttachments(detailsTaskId);
+}
+
+window.openLightbox=async function(path){
+  var url=await getAttachmentUrl(path);
+  if(!url)return;
+  var lb=document.getElementById('img-lightbox');
+  var img=document.getElementById('img-lightbox-img');
+  if(lb){lb.style.display='flex';}
+  if(img)img.src=url;
+  document.addEventListener('keydown',_lbKeyHandler);
+};
+window.closeLightbox=function(){
+  var lb=document.getElementById('img-lightbox');
+  if(lb)lb.style.display='none';
+  document.removeEventListener('keydown',_lbKeyHandler);
+};
+function _lbKeyHandler(e){if(e.key==='Escape')closeLightbox();}
+
+function renderWBTopbar(d){
+  var inp=document.getElementById('wb-name-inp');
+  if(inp)inp.value=WB.name||'';
+  var dt=document.getElementById('wb-daytitle');
+  if(dt)dt.textContent=DL[activeDay]+', '+fmt(d);
+  renderWBToolbar();
+  updateWBBgButtons();
+}
+function updateWBBgButtons(){
+  ['blank','grid','dots'].forEach(function(b){
+    var btn=document.getElementById('wb-bg-'+b);
+    if(!btn)return;
+    btn.style.borderColor=WB.bg===b?'#fff':'rgba(255,255,255,.3)';
+    btn.style.boxShadow=WB.bg===b?'0 0 0 2px rgba(255,255,255,.5)':'none';
+  });
+}
+window.setWBBg=function(bg){
+  WB.bg=bg;
+  if(WB.dayKey)localStorage.setItem(WB.dayKey+'_bg',bg);
+  updateWBBgButtons();
+  wbRedraw();
+};
+window.saveWBName=function(name){
+  WB.name=(name||'').trim();
+  if(WB.dayKey)localStorage.setItem(WB.dayKey+'_name',WB.name);
+};
+function wbDrawBackground(ctx,w,h){
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);
+  if(WB.bg==='grid'){
+    var step=30;
+    ctx.save();ctx.strokeStyle='rgba(0,100,212,0.12)';ctx.lineWidth=0.8;
+    ctx.beginPath();
+    for(var x=step;x<w;x+=step){ctx.moveTo(x,0);ctx.lineTo(x,h);}
+    for(var y=step;y<h;y+=step){ctx.moveTo(0,y);ctx.lineTo(w,y);}
+    ctx.stroke();ctx.restore();
+  }else if(WB.bg==='dots'){
+    var stepD=30;
+    ctx.save();ctx.fillStyle='rgba(0,100,212,0.3)';
+    for(var xd=stepD;xd<w;xd+=stepD){
+      for(var yd=stepD;yd<h;yd+=stepD){
+        ctx.beginPath();ctx.arc(xd,yd,1.5,0,Math.PI*2);ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+}
+
+/* ── DRAG FILES ONTO TASK BLOCKS IN TIMELINE ── */
+var _taskDropTid=null;
+document.addEventListener('dragenter',function(e){
+  if(_draggingAtt)return;
+  var blk=e.target.closest&&e.target.closest('.task-block');
+  if(blk){
+    e.preventDefault();
+    _taskDropTid=blk.dataset.tid;
+    blk.classList.add('file-drop-hover');
+  }
+},true);
+document.addEventListener('dragleave',function(e){
+  var blk=e.target.closest&&e.target.closest('.task-block');
+  if(blk){
+    if(!blk.contains(e.relatedTarget)){
+      blk.classList.remove('file-drop-hover');
+      if(_taskDropTid===blk.dataset.tid)_taskDropTid=null;
+    }
+  }
+},true);
+document.addEventListener('dragover',function(e){
+  if(_draggingAtt)return;
+  if(e.target.closest&&e.target.closest('.task-block'))e.preventDefault();
+},true);
+document.addEventListener('drop',async function(e){
+  if(_draggingAtt)return;
+  var blk=e.target.closest&&e.target.closest('.task-block');
+  if(blk){
+    e.preventDefault();e.stopPropagation();
+    blk.classList.remove('file-drop-hover');
+    _taskDropTid=null;
+    var tid=blk.dataset.tid;
+    var files=e.dataTransfer&&e.dataTransfer.files;
+    if(!files||!files.length)return;
+    if(!currentUser){alert('Sign in to attach files.');return;}
+    var date=addDays(monday,activeDay);
+    for(var i=0;i<files.length;i++) await uploadAttachment(files[i],date,tid);
+    openDetails(tid);
+    setTimeout(function(){renderTaskAttachments(tid);},300);
+  }
+},true);
+
+/* ── INIT ── */
+_buildDetailsWithAttachments();
+initAuth();
+</script>
+
+<!-- Image lightbox -->
+<div id="img-lightbox" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.92);align-items:center;justify-content:center;cursor:pointer" onclick="closeLightbox()">
+  <img id="img-lightbox-img" src="" style="max-width:92vw;max-height:92vh;object-fit:contain;border-radius:8px;box-shadow:0 8px 60px rgba(0,0,0,.6)">
+  <button onclick="closeLightbox()" style="position:absolute;top:16px;right:20px;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:24px;cursor:pointer;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center">&times;</button>
+</div>
+</body>
+</html>
