@@ -1725,7 +1725,7 @@ document.addEventListener('click',e=>{
   if(del){const blk=del.closest('.task-block');if(blk){deleteTask(blk.dataset.tid);e.stopPropagation();return;}}
   const cb=e.target.closest('.tb-cb');
   if(cb){const blk=cb.closest('.task-block');if(blk){setTimeout(()=>toggleDone(blk.dataset.tid),0);return;}}
-  if(!e.target.closest('.task-block')&&!e.target.closest('#task-color-picker')&&!e.target.closest('#pfx-popup')){
+  if(!e.target.closest('.task-block')&&!e.target.closest('#task-color-picker')&&!e.target.closest('#pfx-popup')&&!e.target.closest('#right-panel')){
     exitEditMode();
     if(selectedTasks.size>0||selectedTaskId!=null){
       clearMultiSelect();selectedTaskId=null;
@@ -1933,24 +1933,39 @@ function updateRightPanel(){
 }
 
 function buildDetailsPanelHTML(){
-  const t=detailsTaskId?weekData[activeDay].tasks.find(x=>x.id===detailsTaskId):null;
+  var t=detailsTaskId?weekData[activeDay].tasks.find(function(x){return x.id===detailsTaskId;}):null;
   if(!t)return'<div class="det-no-task">No task selected.<br><br><button onclick="closeDetails()" style="margin-top:8px;padding:5px 14px;background:var(--blue);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">Back to Notes</button></div>';
-  const col=TC[t.color||'blue']||TC.blue;
-  const startStr=unitToStr(t.startUnit);
-  const endStr=unitToStr(t.endUnit+1);
-  const timeStr=t.endUnit>t.startUnit?startStr+' \u2013 '+endStr:startStr;
-  return`<div class="det-hdr" style="background:${col.acc}">
-    <span class="det-hdr-title">Task Details</span>
-    <button class="det-close" onclick="closeDetails()" title="Back to Notes">&times;</button>
-  </div>
-  <div class="det-body" ondragenter="detBodyEnter(event,this)" ondragleave="detBodyLeave(event,this)" ondragover="event.preventDefault()" ondrop="detBodyDrop(event)">
-    <div class="det-label">Task</div>
-    <div class="det-task-title">${esc(t.text)||'<em style="opacity:.5">Untitled task</em>'}</div>
-    <div class="det-time">&#128337; ${timeStr}</div>
-    <div class="det-sep"></div>
-    <div class="det-label" style="margin-top:4px">Notes &amp; Details</div>
-    <textarea class="det-ta" id="det-ta" rows="6" placeholder="Add context, links, or additional notes for this task\u2026">${esc(t.details||'')}</textarea>
-  </div>`;
+  var col=TC[t.color||'blue']||TC.blue;
+  var swatches=Object.keys(TC).map(function(k){
+    var active=(k===(t.color||'blue'));
+    return'<div onclick="detSetColor(\''+k+'\')" title="'+k+'" style="width:18px;height:18px;border-radius:50%;background:'+TC[k].bg+';border:2.5px solid '+(active?TC[k].acc:TC[k].bd)+';cursor:pointer;flex-shrink:0"></div>';
+  }).join('');
+  var doneBadge='<button onclick="detToggleDone()" style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:10px;border:1.5px solid '+(t.done?'#107C10':'#0078D4')+';background:'+(t.done?'#DFF6DD':'#EFF5FB')+';color:'+(t.done?'#107C10':'#0078D4')+';font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">'+(t.done?'&#10003; Done':'&#9675; Pending')+'</button>';
+  var startStr=unitToStr(t.startUnit),endStr=unitToStr(t.endUnit+1);
+  var timeStr=t.endUnit>t.startUnit?startStr+' \u2013 '+endStr:startStr;
+  return'<div class="det-hdr" style="background:'+col.acc+'">'+
+    '<span class="det-hdr-title">Task Details</span>'+
+    '<button class="det-close" onclick="closeDetails()" title="Back to Notes">&times;</button>'+
+    '</div>'+
+    '<div class="det-body" ondragenter="detBodyEnter(event,this)" ondragleave="detBodyLeave(event,this)" ondragover="event.preventDefault()" ondrop="detBodyDrop(event)">'+
+      '<div class="det-drop-overlay"><div class="drop-ov-icon">&#8679;</div><div class="drop-ov-text">Drop files here to attach</div></div>'+
+      '<div class="det-label">Task</div>'+
+      '<div class="det-task-title" contenteditable="true" onblur="detUpdateTaskName(event,\''+t.id+'\')" style="outline:none;cursor:text;border-bottom:1.5px solid transparent;transition:border .12s;font-size:15px;font-weight:600;color:var(--navy);padding-bottom:2px" onfocus="this.style.borderBottomColor=\'#0078D4\'" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}">'+esc(t.text||'Untitled task')+'</div>'+
+      '<div style="display:flex;align-items:center;gap:8px;margin:8px 0 4px;flex-wrap:wrap">'+
+        doneBadge+
+        '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">'+swatches+'</div>'+
+      '</div>'+
+      '<div class="det-sep"></div>'+
+      '<div class="det-label" style="margin-top:8px">Time</div>'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+
+        '<input type="time" id="det-start-inp" value="'+detUnitToTimeInput(t.startUnit)+'" onchange="detUpdateTime()" style="padding:4px 8px;border:1.5px solid #DDE3E9;border-radius:6px;font-size:13px;outline:none;font-family:inherit">'+
+        '<span style="color:#95A8B8;font-size:12px">to</span>'+
+        '<input type="time" id="det-end-inp" value="'+detUnitToTimeInput(t.endUnit+1)+'" onchange="detUpdateTime()" style="padding:4px 8px;border:1.5px solid #DDE3E9;border-radius:6px;font-size:13px;outline:none;font-family:inherit">'+
+      '</div>'+
+      '<div class="det-sep"></div>'+
+      '<div class="det-label" style="margin-top:8px">Notes &amp; Details</div>'+
+      '<textarea class="det-ta" id="det-ta" rows="4" placeholder="Add context, links, or notes\u2026">'+esc(t.details||'')+'</textarea>'+
+    '</div>';
 }
 
 window.openDetails=function(tid){
@@ -2779,10 +2794,10 @@ var _detDragCount=0;
 window.detBodyEnter=function(e,el){if(!el)return;e.preventDefault();_detDragCount++;el.classList.add('det-drop-active');};
 window.detBodyLeave=function(e,el){if(!el)return;_detDragCount=Math.max(0,_detDragCount-1);if(_detDragCount===0)el.classList.remove('det-drop-active');};
 
-window.detUpdateTaskName=function(e,tid){
+window.detUpdateTaskName=function(e){
   var newName=(e.target.innerText||'').trim();
   if(!newName)return;
-  var t=weekData[activeDay].tasks.find(function(x){return x.id===tid;});
+  var t=weekData[activeDay].tasks.find(function(x){return x.id===detailsTaskId;});
   if(t&&t.text!==newName){t.text=newName;scheduleSave();renderScheduleOnly();}
 };
 
@@ -2936,21 +2951,21 @@ function detTimeInputToUnit(val){
   var baseMins=4*60+30;
   return Math.max(0,Math.min(UNITS_TOTAL-1,Math.round((totalMins-baseMins)/15)));
 }
-window.detSetColor=function(tid,color){
-  var t=weekData[activeDay].tasks.find(function(x){return x.id===tid;});
+window.detSetColor=function(color){
+  var t=weekData[activeDay].tasks.find(function(x){return x.id===detailsTaskId;});
   if(!t)return;
   t.color=color;scheduleSave();renderScheduleOnly();updateRightPanel();
 };
-window.detToggleDone=function(tid){
-  var t=weekData[activeDay].tasks.find(function(x){return x.id===tid;});
+window.detToggleDone=function(){
+  var t=weekData[activeDay].tasks.find(function(x){return x.id===detailsTaskId;});
   if(!t)return;
   pushHistory();t.done=!t.done;scheduleSave();renderScheduleOnly();updateRightPanel();
 };
-window.detUpdateTime=function(tid){
-  var t=weekData[activeDay].tasks.find(function(x){return x.id===tid;});
+window.detUpdateTime=function(){
+  var t=weekData[activeDay].tasks.find(function(x){return x.id===detailsTaskId;});
   if(!t)return;
-  var si=document.getElementById('det-start-'+tid);
-  var ei=document.getElementById('det-end-'+tid);
+  var si=document.getElementById('det-start-inp');
+  var ei=document.getElementById('det-end-inp');
   if(!si||!ei)return;
   var newStart=detTimeInputToUnit(si.value);
   var newEnd=detTimeInputToUnit(ei.value)-1;
