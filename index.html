@@ -322,6 +322,18 @@ select.wb-sel option{background:#1D4A72;color:#fff}
 #img-lightbox.open{display:flex}
 .att-img-preview{width:72px;height:72px;object-fit:cover;border-radius:6px;border:1px solid var(--bd);flex-shrink:0;background:var(--bgp);cursor:pointer;transition:opacity .12s}
 .att-img-preview:hover{opacity:.85}
+
+.task-block.file-drop-hover{outline:2px dashed #0078D4 !important;outline-offset:-2px;}
+.task-block.file-drop-hover .tb-drop-ind{display:flex !important}
+.tb-drop-ind{display:none;position:absolute;inset:0;background:rgba(235,245,255,.93);border-radius:3px;flex-direction:column;align-items:center;justify-content:center;gap:4px;pointer-events:none;z-index:30}
+.tb-drop-ind-icon{font-size:20px;color:#0078D4;line-height:1}
+.tb-drop-ind-text{font-size:11px;font-weight:700;color:#0078D4}
+
+.db-toolbar select:focus,.db-toolbar input:focus{border-color:#0078D4;outline:none}
+.db-editable:hover{background:#EFF5FB;border-radius:3px}
+.db-editable:focus{background:#EFF5FB;border-radius:3px;outline:1px solid #0078D4}
+.db-table th{cursor:pointer}
+.db-table th:hover{background:#EEF4FB}
 </style>
 </head>
 <body>
@@ -381,7 +393,7 @@ select.wb-sel option{background:#1D4A72;color:#fff}
       <button class="db-tab" onclick="switchDBTab('images')" data-tab="images">&#128247; Images</button>
       <button class="db-tab" onclick="switchDBTab('files')" data-tab="files">&#128196; Files</button>
     </div>
-    <div id="db-body" style="flex:1;overflow:auto;padding:16px"></div>
+    <div id="db-body" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden"></div>
   </div>
 </div>
 
@@ -887,7 +899,12 @@ function setupWBEvents(canvas){
   function move(e){
     if(!WB.isDrawing)return;
     const{x,y}=wbGetPos(e);
-    if(WB.tool==='pen'||WB.tool==='eraser'){WB.pts.push([x,y]);wbRedraw();wbDraw(WB.ctx,{type:WB.tool,pts:WB.pts,color:WB.color,lineWidth:WB.lineWidth});}
+    if(WB.tool==='pen'||WB.tool==='eraser'){
+      WB.pts.push([x,y]);
+      wbRedraw();
+      if(WB.tool==='pen')wbDraw(WB.ctx,{type:'pen',pts:WB.pts,color:WB.color,lineWidth:WB.lineWidth});
+      if(WB.tool==='eraser')wbDraw(WB.ctx,{type:'eraser',pts:WB.pts,color:WB.color,lineWidth:WB.lineWidth});
+    }
     else{wbRedraw();wbDraw(WB.ctx,{type:WB.shapeType,x1:WB.sx,y1:WB.sy,x2:x,y2:y,color:WB.color,lineWidth:WB.lineWidth,fill:WB.fillColor});}
     e.preventDefault();
   }
@@ -1237,6 +1254,7 @@ function renderTaskBlocks(dayData){
     parts.push('<button class="tb-del" style="color:'+txtCol+'">&times;</button>');
     parts.push('</div>');
     parts.push('<div class="tb-resize"><span style="display:block;width:28px;height:2px;background:'+(isMSel?'rgba(255,255,255,.45)':col.bd)+';border-radius:1px;opacity:.6;margin:0 auto"></span></div>');
+    parts.push('<div class="tb-drop-ind"><div class="tb-drop-ind-icon">&#8679;</div><div class="tb-drop-ind-text">Drop to attach</div></div>');
     parts.push('</div>');
     return parts.join('');
   }).join('');
@@ -1326,7 +1344,7 @@ function renderDayTabs(){
 function renderWBSection(){
   var d=addDays(monday,activeDay),exists=wbExists(d);
   var wbContent=exists
-    ?'<div class="wb-row"><div class="wb-item" onclick="openWhiteboard()"><span style="font-size:14px">&#9998;</span><span class="wb-nm">'+DS[activeDay]+' Whiteboard</span></div><button class="wb-x" onclick="wbDeleteSaved(event)">&times;</button></div>'
+    ?'<div class="wb-row"><div class="wb-item" onclick="openWhiteboard()"><span style="font-size:14px">&#9998;</span><span class="wb-nm">'+(localStorage.getItem(getWbKey(d)+'_name')||DS[activeDay]+' Whiteboard')+'</span></div><button class="wb-x" onclick="wbDeleteSaved(event)">&times;</button></div>'
     :'<button class="wb-add" onclick="openWhiteboard()"><span>&#43;</span><span>Add Whiteboard</span></button>';
   return '<div class="wb-sec"><div class="dt-hd">Whiteboard</div><div class="wb-body">'+wbContent+'</div></div>'
     +'<div class="day-files"><div class="day-files-hdr">Files &amp; Images</div>'
@@ -1925,7 +1943,7 @@ function buildDetailsPanelHTML(){
     <span class="det-hdr-title">Task Details</span>
     <button class="det-close" onclick="closeDetails()" title="Back to Notes">&times;</button>
   </div>
-  <div class="det-body" ondragenter="event.preventDefault();this.classList.add('det-drop-active')" ondragleave="if(!this.contains(event.relatedTarget))this.classList.remove('det-drop-active')" ondragover="event.preventDefault()" ondrop="detBodyDrop(event)">
+  <div class="det-body" ondragenter="detBodyEnter(event,this)" ondragleave="detBodyLeave(event,this)" ondragover="event.preventDefault()" ondrop="detBodyDrop(event)">
     <div class="det-label">Task</div>
     <div class="det-task-title">${esc(t.text)||'<em style="opacity:.5">Untitled task</em>'}</div>
     <div class="det-time">&#128337; ${timeStr}</div>
@@ -2405,15 +2423,29 @@ async function renderTaskAttachments(taskId){
 
 /* ── DATABASE VIEW ── */
 var _dbTab='tasks';
+
+/* ══════════════════════════════════════════════════════════
+   LIBRARY — State, Search/Sort/Filter, Edit, Full rebuild
+   ══════════════════════════════════════════════════════════ */
+var _dbTab='tasks';
+var _dbData=[];       // raw rows from Supabase for current tab
+var _dbSearch='';
+var _dbSort={col:null,dir:'asc'};
+var _dbFilters={};    // {colKey: value}
+
 window.openDB=async function(){
   var m=document.getElementById('db-modal');
-  m.style.display='flex';
-  loadDBTab(_dbTab);
+  if(m)m.style.display='flex';
+  await loadDBTab(_dbTab);
 };
-window.closeDB=function(){document.getElementById('db-modal').style.display='none';};
+window.closeDB=function(){
+  var m=document.getElementById('db-modal');
+  if(m)m.style.display='none';
+};
 window.switchDBTab=function(tab){
-  _dbTab=tab;
+  _dbTab=tab;_dbSearch='';_dbSort={col:null,dir:'asc'};_dbFilters={};
   document.querySelectorAll('.db-tab').forEach(function(b){b.classList.toggle('active',b.dataset.tab===tab);});
+  var si=document.getElementById('db-search-inp');if(si)si.value='';
   loadDBTab(tab);
 };
 
@@ -2421,27 +2453,27 @@ async function loadDBTab(tab){
   var body=document.getElementById('db-body');
   if(!currentUser){body.innerHTML='<div class="db-empty">Sign in to view your library.</div>';return;}
   body.innerHTML='<div class="db-loading">Loading\u2026</div>';
-  var sb=getSB();var uid=currentUser.id;
+  var sb=getSB(),uid=currentUser.id;
   if(tab==='tasks'){
     var {data}=await sb.from('tasks').select('*').eq('user_id',uid).order('date',{ascending:false}).order('start_unit');
-    renderDBTasks(data||[]);
+    _dbData=data||[];renderDBTasks();
   }else if(tab==='notes'){
     var {data}=await sb.from('day_notes').select('*').eq('user_id',uid).order('date',{ascending:false});
-    renderDBNotes(data||[]);
+    _dbData=data||[];renderDBNotes();
   }else if(tab==='whiteboards'){
     var {data}=await sb.from('whiteboards').select('id,date,updated_at').eq('user_id',uid).order('date',{ascending:false});
-    renderDBWhiteboards(data||[]);
+    _dbData=data||[];renderDBWhiteboards();
   }else if(tab==='images'){
     var {data}=await sb.from('attachments').select('*').eq('user_id',uid).eq('type','image').order('created_at',{ascending:false});
-    renderDBAttachments(data||[],'Images');
+    _dbData=data||[];renderDBAttachments('Images');
   }else if(tab==='files'){
     var {data}=await sb.from('attachments').select('*').eq('user_id',uid).eq('type','file').order('created_at',{ascending:false});
-    renderDBAttachments(data||[],'Files');
+    _dbData=data||[];renderDBAttachments('Files');
   }
 }
 
 function dbDateLink(ds){
-  return'<a class="db-date-link" onclick="dbGoDate(\''+ds+'\')">'+ds+'</a>';
+  return '<a class="db-date-link" onclick="dbGoDate(\''+ds+'\')">'+ds+'</a>';
 }
 window.dbGoDate=function(ds){
   closeDB();
@@ -2450,45 +2482,216 @@ window.dbGoDate=function(ds){
   calMonth=new Date(d.getFullYear(),d.getMonth(),1);loadWeek();
 };
 
-function renderDBTasks(rows){
-  if(!rows.length){document.getElementById('db-body').innerHTML='<div class="db-empty">No tasks yet.</div>';return;}
-  var html='<table class="db-table"><thead><tr><th>Date</th><th>Time</th><th>Task</th><th>Status</th><th>Color</th></tr></thead><tbody>';
+/* ── Search/Sort/Filter bar ── */
+function renderDBToolbar(cols){
+  var filterOpts=cols.map(function(col){
+    return '<option value="">All '+col.label+'</option>'+
+      [...new Set(_dbData.map(function(r){return col.val(r)||'';}).filter(Boolean))].map(function(v){
+        return '<option value="'+esc(v)+'"'+((_dbFilters[col.key]===v)?' selected':'')+'>'+esc(v)+'</option>';
+      }).join('');
+  });
+  return '<div class="db-toolbar" style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid #DDE3E9;flex-shrink:0;flex-wrap:wrap">'+
+    '<div style="position:relative;flex:1;min-width:180px"><span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#95A8B8;font-size:14px">&#128269;</span>'+
+    '<input id="db-search-inp" type="text" placeholder="Search\u2026" value="'+esc(_dbSearch)+'" oninput="_dbSearch=this.value;re'+_dbTab+'DB()" '+
+    'style="width:100%;padding:6px 10px 6px 30px;border:1.5px solid #DDE3E9;border-radius:6px;font-size:13px;outline:none;font-family:inherit"></div>'+
+    cols.map(function(col,i){
+      return '<select onchange="_dbFilters[\''+col.key+'\']=this.value;re'+_dbTab+'DB()" style="padding:6px 8px;border:1.5px solid #DDE3E9;border-radius:6px;font-size:12px;outline:none;color:#4F6A80;font-family:inherit">'+filterOpts[i]+'</select>';
+    }).join('')+
+    '<button onclick="exportDB()" style="padding:6px 12px;border:1.5px solid #DDE3E9;border-radius:6px;font-size:12px;color:#4F6A80;background:#fff;cursor:pointer">&#8681; Export</button>'+
+    '</div>';
+}
+
+function dbSortHeader(label,colKey){
+  var arrow=_dbSort.col===colKey?(_dbSort.dir==='asc'?'&#9650;':'&#9660;'):'&#8693;';
+  return '<th onclick="dbSortBy(\''+colKey+'\')" style="cursor:pointer;user-select:none;white-space:nowrap">'+label+' <span style="font-size:10px;color:#95A8B8">'+arrow+'</span></th>';
+}
+window.dbSortBy=function(col){
+  if(_dbSort.col===col)_dbSort.dir=_dbSort.dir==='asc'?'desc':'asc';
+  else{_dbSort.col=col;_dbSort.dir='asc';}
+  window['re'+_dbTab+'DB']();
+};
+
+function applySearchSortFilter(rows,cols){
+  var q=_dbSearch.toLowerCase();
+  if(q){rows=rows.filter(function(r){return cols.some(function(c){var v=c.val(r)||'';return v.toString().toLowerCase().includes(q);});});}
+  Object.keys(_dbFilters).forEach(function(k){
+    if(!_dbFilters[k])return;
+    var col=cols.find(function(c){return c.key===k;});
+    if(!col)return;
+    rows=rows.filter(function(r){return (col.val(r)||'')===_dbFilters[k];});
+  });
+  if(_dbSort.col){
+    var sc=_dbSort.col,sd=_dbSort.dir;
+    var sc_col=cols.find(function(c){return c.key===sc;});
+    if(sc_col)rows=rows.slice().sort(function(a,b){
+      var av=sc_col.val(a)||'',bv=sc_col.val(b)||'';
+      return sd==='asc'?(av>bv?1:av<bv?-1:0):(av<bv?1:av>bv?-1:0);
+    });
+  }
+  return rows;
+}
+
+/* ── TASKS table ── */
+function retasksDB(){renderDBTasks();}
+function renderDBTasks(){
+  var body=document.getElementById('db-body');if(!body)return;
+  var cols=[
+    {key:'date',label:'Date',val:function(r){return r.date;}},
+    {key:'status',label:'Status',val:function(r){return r.done?'Done':'Pending';}},
+    {key:'color',label:'Color',val:function(r){return r.color||'blue';}},
+  ];
+  var rows=applySearchSortFilter(_dbData.slice(),cols);
+  if(!rows.length){body.innerHTML=renderDBToolbar(cols)+'<div class="db-empty">No tasks match.</div>';return;}
+  var html=renderDBToolbar(cols)+'<div style="overflow:auto;flex:1"><table class="db-table"><thead><tr>'+
+    dbSortHeader('Date','date')+dbSortHeader('Time','start_unit')+dbSortHeader('Task','text')+
+    dbSortHeader('Status','status')+dbSortHeader('Color','color')+'<th>Details</th><th>Attachments</th></tr></thead><tbody>';
   rows.forEach(function(t){
     var start=unitToStr(t.start_unit),end=unitToStr(t.end_unit+1);
     var time=t.start_unit===t.end_unit?start:start+' \u2013 '+end;
     var col=TC[t.color||'blue']||TC.blue;
-    var badge='<span class="db-badge" style="background:'+(t.done?'#DFF6DD':'#EFF5FB')+';color:'+(t.done?'#107C10':'#0078D4')+'">'+
-      (t.done?'\u2713 Done':'\u25cb Pending')+'</span>';
-    var swatch='<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:'+col.acc+'"></span> '+(t.color||'blue');
-    var details=t.details?'<div style="font-size:11px;color:#95A8B8;margin-top:2px">'+esc(t.details.slice(0,60))+(t.details.length>60?'\u2026':'')+'</div>':'';
-    html+='<tr><td>'+dbDateLink(t.date)+'</td><td style="font-family:\'IBM Plex Mono\',monospace;font-size:12px;white-space:nowrap">'+time+'</td>'+
-      '<td><div>'+esc(t.text||'(untitled)')+'</div>'+details+'</td>'+
-      '<td>'+badge+'</td><td style="font-size:12px">'+swatch+'</td></tr>';
+    var statusBadge='<span class="db-badge" style="background:'+(t.done?'#DFF6DD':'#EFF5FB')+';color:'+(t.done?'#107C10':'#0078D4')+';cursor:pointer" onclick="dbToggleDone(\''+t.id+'\',\''+t.date+'\')">'+(t.done?'\u2713 Done':'\u25cb Pending')+'</span>';
+    var colorSwatch='<span style="display:inline-flex;align-items:center;gap:5px"><span style="width:11px;height:11px;border-radius:50%;background:'+col.acc+';display:inline-block"></span>'+
+      '<select onchange="dbChangeColor(\''+t.id+'\',\''+t.date+'\',this.value)" style="border:none;background:none;font-size:12px;color:#4F6A80;cursor:pointer;font-family:inherit">'+
+      ['blue','green','orange','yellow','red','purple','pink'].map(function(clr){return '<option value="'+clr+'"'+(clr===(t.color||'blue')?' selected':'')+'>'+clr+'</option>';}).join('')+'</select></span>';
+    var taskCell='<span class="db-editable" contenteditable="true" onblur="dbUpdateTask(\''+t.id+'\',\''+t.date+'\',\'text\',this.innerText.trim())" style="outline:none;cursor:text">'+esc(t.text||'')+'</span>';
+    var detCell=t.details?'<span style="font-size:11px;color:#4F6A80;max-width:120px;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(t.details)+'">'+esc(t.details.slice(0,40))+'</span>':'<span style="color:#BFC9D3;font-size:11px">-</span>';
+    html+='<tr><td>'+dbDateLink(t.date)+'</td><td style="font-family:\'IBM Plex Mono\',monospace;font-size:12px;white-space:nowrap">'+time+'</td><td>'+taskCell+'</td><td>'+statusBadge+'</td><td>'+colorSwatch+'</td><td>'+detCell+'</td><td><button onclick="dbShowAtts(\''+t.id+'\',\''+t.date+'\')" style="font-size:11px;padding:2px 8px;border:1px solid #DDE3E9;border-radius:4px;cursor:pointer;background:#fff;color:#4F6A80">&#128206; View</button></td></tr>';
   });
-  document.getElementById('db-body').innerHTML=html+'</tbody></table>';
+  body.innerHTML=html+'</tbody></table></div>';
 }
 
-function renderDBNotes(rows){
-  if(!rows.length){document.getElementById('db-body').innerHTML='<div class="db-empty">No notes yet.</div>';return;}
-  var html='<table class="db-table"><thead><tr><th>Date</th><th>Notes</th><th>Updated</th></tr></thead><tbody>';
+/* ── NOTES table ── */
+function renotesDB(){renderDBNotes();}
+function renderDBNotes(){
+  var body=document.getElementById('db-body');if(!body)return;
+  var cols=[{key:'date',label:'Date',val:function(r){return r.date;}}];
+  var rows=applySearchSortFilter(_dbData.filter(function(r){return (r.notes||[]).length>0;}),cols);
+  if(!rows.length){body.innerHTML=renderDBToolbar(cols)+'<div class="db-empty">No notes yet.</div>';return;}
+  var html=renderDBToolbar(cols)+'<div style="overflow:auto;flex:1"><table class="db-table"><thead><tr>'+dbSortHeader('Date','date')+'<th>Notes</th>'+dbSortHeader('Updated','updated_at')+'</tr></thead><tbody>';
   rows.forEach(function(r){
-    var notes=r.notes||[];var count=notes.length;
-    var preview=notes.slice(0,3).map(function(n){return esc(n.text.slice(0,50)||(n.text));}).join(', ');
-    html+='<tr><td>'+dbDateLink(r.date)+'</td><td><span style="color:#4F6A80">'+count+' note'+(count!==1?'s':'')+'</span>'+(preview?'<div style="font-size:11px;color:#95A8B8;margin-top:2px">'+preview+'</div>':'')+'</td>'+
+    var notes=r.notes||[],count=notes.length;
+    var preview=notes.slice(0,2).map(function(n){return esc((n.text||'').slice(0,60));}).filter(Boolean).join('<br>');
+    html+='<tr><td>'+dbDateLink(r.date)+'</td><td><span style="color:#4F6A80;font-size:12px">'+count+' note'+(count!==1?'s':'')+'</span>'+(preview?'<div style="font-size:11px;color:#95A8B8;margin-top:2px">'+preview+'</div>':'')+'</td>'+
       '<td style="font-size:11px;color:#95A8B8">'+new Date(r.updated_at).toLocaleDateString()+'</td></tr>';
   });
-  document.getElementById('db-body').innerHTML=html+'</tbody></table>';
+  body.innerHTML=html+'</tbody></table></div>';
 }
 
-function renderDBWhiteboards(rows){
-  if(!rows.length){document.getElementById('db-body').innerHTML='<div class="db-empty">No whiteboards yet.</div>';return;}
-  var html='<table class="db-table"><thead><tr><th>Date</th><th>Updated</th><th>Action</th></tr></thead><tbody>';
+/* ── WHITEBOARDS table ── */
+function rewhiteboardsDB(){renderDBWhiteboards();}
+function renderDBWhiteboards(){
+  var body=document.getElementById('db-body');if(!body)return;
+  var cols=[{key:'date',label:'Date',val:function(r){return r.date;}}];
+  var rows=applySearchSortFilter(_dbData.slice(),cols);
+  if(!rows.length){body.innerHTML=renderDBToolbar(cols)+'<div class="db-empty">No whiteboards yet.</div>';return;}
+  var html=renderDBToolbar(cols)+'<div style="overflow:auto;flex:1"><table class="db-table"><thead><tr>'+dbSortHeader('Date','date')+'<th>Name</th>'+dbSortHeader('Updated','updated_at')+'<th></th></tr></thead><tbody>';
   rows.forEach(function(r){
-    html+='<tr><td>'+dbDateLink(r.date)+'</td><td style="font-size:11px;color:#95A8B8">'+new Date(r.updated_at).toLocaleDateString()+'</td>'+
-      '<td><button onclick="dbGoDate(\''+r.date+'\')" style="font-size:12px;padding:3px 10px;border:1px solid #DDE3E9;border-radius:5px;cursor:pointer;background:#fff">Open &#9998;</button></td></tr>';
+    var savedName=localStorage.getItem('wb_'+r.date+'_name')||'';
+    html+='<tr><td>'+dbDateLink(r.date)+'</td><td style="font-size:12px;color:#4F6A80">'+(savedName||'<em style="color:#BFC9D3">Untitled</em>')+'</td>'+
+      '<td style="font-size:11px;color:#95A8B8">'+new Date(r.updated_at).toLocaleDateString()+'</td>'+
+      '<td><button onclick="dbGoDate(\''+r.date+'\')" style="font-size:11px;padding:2px 8px;border:1px solid #DDE3E9;border-radius:4px;cursor:pointer;background:#fff">Open &#9998;</button></td></tr>';
   });
-  document.getElementById('db-body').innerHTML=html+'</tbody></table>';
+  body.innerHTML=html+'</tbody></table></div>';
 }
+
+/* ── ATTACHMENTS tables ── */
+function reimagesDB(){renderDBAttachments('Images');}
+function refilesDB(){renderDBAttachments('Files');}
+function renderDBAttachments(label){
+  var body=document.getElementById('db-body');if(!body)return;
+  var cols=[
+    {key:'date',label:'Date',val:function(r){return r.date;}},
+    {key:'name',label:'Name',val:function(r){return r.name;}},
+    {key:'linked',label:'Linked to',val:function(r){return r.task_id?'Task':'Day'}},
+  ];
+  var rows=applySearchSortFilter(_dbData.slice(),cols);
+  if(!rows.length){body.innerHTML=renderDBToolbar(cols)+'<div class="db-empty">No '+label.toLowerCase()+' yet.</div>';return;}
+  var html=renderDBToolbar(cols)+'<div style="overflow:auto;flex:1"><table class="db-table"><thead><tr>'+
+    dbSortHeader('Date','date')+dbSortHeader('Name','name')+'<th>Size</th>'+dbSortHeader('Linked to','linked')+'<th></th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    var sz=r.size_bytes?Math.round(r.size_bytes/1024)+'KB':'—';
+    html+='<tr><td>'+dbDateLink(r.date)+'</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px">'+esc(r.name)+'</td>'+
+      '<td style="font-size:11px;color:#95A8B8">'+sz+'</td>'+
+      '<td style="font-size:12px">'+(r.task_id?'Task':'Day')+'</td>'+
+      '<td><button onclick="openAtt(\''+r.id+'\',\''+esc(r.storage_path||'')+'\')" style="font-size:11px;padding:2px 8px;border:1px solid #DDE3E9;border-radius:4px;cursor:pointer;background:#fff">Open &#8599;</button></td></tr>';
+  });
+  body.innerHTML=html+'</tbody></table></div>';
+}
+
+/* ── Inline edit helpers ── */
+window.dbToggleDone=async function(taskId,date){
+  if(!currentUser)return;
+  var row=_dbData.find(function(r){return r.id===taskId;});
+  if(!row)return;
+  row.done=!row.done;
+  await getSB().from('tasks').update({done:row.done}).eq('id',taskId);
+  // If viewing this day, also update weekData
+  if(date===addDays(monday,activeDay).toISOString().slice(0,10)){
+    var t=weekData[activeDay].tasks.find(function(x){return x.id===taskId;});
+    if(t){t.done=row.done;renderScheduleOnly();}
+  }
+  renderDBTasks();
+};
+window.dbChangeColor=async function(taskId,date,color){
+  if(!currentUser)return;
+  var row=_dbData.find(function(r){return r.id===taskId;});
+  if(row)row.color=color;
+  await getSB().from('tasks').update({color:color}).eq('id',taskId);
+  if(date===addDays(monday,activeDay).toISOString().slice(0,10)){
+    var t=weekData[activeDay].tasks.find(function(x){return x.id===taskId;});
+    if(t){t.color=color;renderScheduleOnly();}
+  }
+  renderDBTasks();
+};
+window.dbUpdateTask=async function(taskId,date,field,value){
+  if(!currentUser||!value)return;
+  var row=_dbData.find(function(r){return r.id===taskId;});
+  if(row)row[field]=value;
+  var update={};update[field]=value;
+  await getSB().from('tasks').update(update).eq('id',taskId);
+  if(date===addDays(monday,activeDay).toISOString().slice(0,10)){
+    var t=weekData[activeDay].tasks.find(function(x){return x.id===taskId;});
+    if(t){t[field]=value;renderScheduleOnly();}
+  }
+};
+window.dbShowAtts=async function(taskId,date){
+  if(!currentUser)return;
+  var {data}=await getSB().from('attachments').select('*').eq('task_id',taskId);
+  var atts=data||[];
+  var body=document.getElementById('db-body');if(!body)return;
+  if(!atts.length){alert('No attachments for this task.');return;}
+  var html='<div style="padding:16px"><button onclick="loadDBTab(\'tasks\')" style="font-size:12px;padding:4px 12px;border:1.5px solid #DDE3E9;border-radius:6px;cursor:pointer;margin-bottom:12px;background:#fff">&#8592; Back to Tasks</button>'+
+    '<div style="font-weight:600;margin-bottom:10px;color:#1A3A5C">Attachments</div>';
+  for(var i=0;i<atts.length;i++){
+    var a=atts[i];
+    html+='<div style="display:flex;align-items:center;gap:10px;padding:8px;border:1px solid #DDE3E9;border-radius:6px;margin-bottom:6px">'+
+      '<span style="font-size:18px">'+(a.type==='image'?'&#128247;':'&#128196;')+'</span>'+
+      '<span style="flex:1;font-size:13px">'+esc(a.name)+'</span>'+
+      '<button onclick="openAtt(\''+a.id+'\',\''+esc(a.storage_path||'')+'\')" style="font-size:12px;padding:4px 10px;border:1px solid #DDE3E9;border-radius:5px;cursor:pointer;background:#fff">Open &#8599;</button></div>';
+  }
+  body.innerHTML=html+'</div>';
+};
+
+/* ── Export to CSV ── */
+window.exportDB=function(){
+  var rows=_dbData;
+  if(!rows.length)return;
+  var keys=Object.keys(rows[0]).filter(function(k){return k!=='user_id';});
+  var csv=keys.join(',')+'\n'+rows.map(function(r){
+    return keys.map(function(k){
+      var v=r[k];
+      if(v===null||v===undefined)return '';
+      if(typeof v==='object')return '"'+JSON.stringify(v).replace(/"/g,'""')+'"';
+      return '"'+String(v).replace(/"/g,'""')+'"';
+    }).join(',');
+  }).join('\n');
+  var blob=new Blob([csv],{type:'text/csv'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=url;a.download=_dbTab+'_export.csv';a.click();
+  URL.revokeObjectURL(url);
+};
+
+
 
 function renderDBAttachments(rows, label){
   if(!rows.length){document.getElementById('db-body').innerHTML='<div class="db-empty">No '+label.toLowerCase()+' yet.</div>';return;}
@@ -2517,7 +2720,7 @@ function _buildDetailsWithAttachments(){
       '<button class="det-close" onclick="closeDetails()" title="Back to Notes">&times;</button>'+
       '</div><div class="det-body"><div class="det-drop-overlay"><div class="drop-ov-icon">&#8679;</div><div class="drop-ov-text">Drop files here to attach</div></div>'+
       '<div class="det-label">Task</div>'+
-      '<div class="det-task-title">'+esc(t.text)||'<em style="opacity:.5">Untitled task</em>'+'</div>'+
+      '<div class="det-task-title" contenteditable="true" onblur="detUpdateTaskName(event,\''+t.id+'\')" style="outline:none;cursor:text;border-bottom:1.5px solid transparent;transition:border .12s" onfocus="this.style.borderBottomColor=\'#0078D4\'" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}">'+esc(t.text||'Untitled task')+'</div>'+
       '<div class="det-time">&#128337; '+timeStr+'</div>'+
       '<div class="det-sep"></div>'+
       '<div class="det-label" style="margin-top:4px">Notes &amp; Details</div>'+
@@ -2571,7 +2774,20 @@ window.handleTaskFileDrop=async function(e,taskId){
   renderTaskAttachments(taskId);
 }
 
+
+var _detDragCount=0;
+window.detBodyEnter=function(e,el){if(!el)return;e.preventDefault();_detDragCount++;el.classList.add('det-drop-active');};
+window.detBodyLeave=function(e,el){if(!el)return;_detDragCount=Math.max(0,_detDragCount-1);if(_detDragCount===0)el.classList.remove('det-drop-active');};
+
+window.detUpdateTaskName=function(e,tid){
+  var newName=(e.target.innerText||'').trim();
+  if(!newName)return;
+  var t=weekData[activeDay].tasks.find(function(x){return x.id===tid;});
+  if(t&&t.text!==newName){t.text=newName;scheduleSave();renderScheduleOnly();}
+};
+
 window.detBodyDrop=async function(e){
+  _detDragCount=0;
   if(!detailsTaskId)return;
   e.preventDefault();e.stopPropagation();
   var el=e.currentTarget;if(el)el.classList.remove('det-drop-active');
@@ -2638,6 +2854,8 @@ window.setWBBg=function(bg){
 window.saveWBName=function(name){
   WB.name=(name||'').trim();
   if(WB.dayKey)localStorage.setItem(WB.dayKey+'_name',WB.name);
+  var l=document.querySelector('.left');
+  if(l)l.innerHTML=renderCalendar()+renderDayTabs()+renderWBSection();
 };
 function wbDrawBackground(ctx,w,h){
   ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);
