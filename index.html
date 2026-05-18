@@ -210,14 +210,14 @@ select.wb-sel option{background:#1D4A72;color:#fff}
 
 /* TASK DETAILS PANEL */
 .det-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 13px;border-bottom:1px solid rgba(255,255,255,.2);flex-shrink:0}
-.det-hdr-title{font-family:'Lora',serif;font-style:italic;font-size:14px;color:#fff}
+.det-hdr-title{font-size:14px;font-weight:600;color:#fff}
 .det-close{color:rgba(255,255,255,.8);font-size:18px;background:transparent;border:none;cursor:pointer;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:4px;transition:background .1s;line-height:1}
 .det-close:hover{background:rgba(255,255,255,.2);color:#fff}
 .det-body{flex:1;overflow-y:auto;padding:12px}
 .det-chip{display:inline-flex;align-items:center;gap:5px;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 8px;font-size:11px;color:var(--t2);margin-bottom:10px;flex-shrink:0}
 .det-dot{width:10px;height:10px;border-radius:50%}
-.det-label{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
-.det-task-title{font-size:14px;font-family:'Lora',serif;font-weight:500;color:var(--text);margin-bottom:12px;line-height:1.4;word-break:break-word;border:1px solid transparent;border-radius:4px;padding:2px 4px;cursor:text}
+.det-label{font-size:10px;font-weight:700;color:#95A8B8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;margin-top:2px}
+.det-task-title{font-size:16px;font-weight:700;color:var(--navy);margin-bottom:4px;line-height:1.3}
 .det-time{font-size:12px;color:var(--t2);font-family:'IBM Plex Mono',monospace;margin-bottom:14px}
 .det-sep{height:1px;background:var(--bd);margin:10px 0}
 .det-ta{width:100%;background:var(--bgp);border:1px solid var(--bd);outline:none;padding:9px;resize:none;font-size:12px;line-height:1.65;min-height:160px;border-radius:6px;color:var(--text);font-family:inherit;transition:border .12s}
@@ -1725,7 +1725,7 @@ document.addEventListener('click',e=>{
   if(del){const blk=del.closest('.task-block');if(blk){deleteTask(blk.dataset.tid);e.stopPropagation();return;}}
   const cb=e.target.closest('.tb-cb');
   if(cb){const blk=cb.closest('.task-block');if(blk){setTimeout(()=>toggleDone(blk.dataset.tid),0);return;}}
-  if(!e.target.closest('.task-block')&&!e.target.closest('#task-color-picker')&&!e.target.closest('#pfx-popup')){
+  if(!e.target.closest('.task-block')&&!e.target.closest('#task-color-picker')&&!e.target.closest('#pfx-popup')&&!e.target.closest('#right-panel')){
     exitEditMode();
     if(selectedTasks.size>0||selectedTaskId!=null){
       clearMultiSelect();selectedTaskId=null;
@@ -1922,13 +1922,25 @@ function updateRightPanel(){
       });
       autoResize(ta);
     }
+    // Set time select values
+    var dt=detailsTaskId?weekData[activeDay].tasks.find(function(x){return x.id===detailsTaskId;}):null;
+    if(dt){
+      var ss2=document.getElementById('det-start-sel');
+      var es2=document.getElementById('det-end-sel');
+      if(ss2)ss2.value=dt.startUnit;
+      if(es2)es2.value=dt.endUnit+1;
+    }
     // Load attachments for this task
     if(detailsTaskId)setTimeout(function(){renderTaskAttachments(detailsTaskId);},50);
   }else{
     rp.innerHTML='<div class="notes-hdr">Notes</div><div class="notes-body" id="notes-body"></div>';
     renderNotesBody();
   var ar=document.getElementById('app-root');if(ar)ar.style.display='';
-  setTimeout(function(){renderDayFiles(addDays(monday,activeDay));},100);
+  // Load day files once per day (not on every render)
+  if(_dayFilesDay!==activeDay){
+    _dayFilesDay=activeDay;
+    setTimeout(function(){renderDayFiles(addDays(monday,activeDay));},120);
+  }
   }
 }
 
@@ -1936,20 +1948,45 @@ function buildDetailsPanelHTML(){
   const t=detailsTaskId?weekData[activeDay].tasks.find(x=>x.id===detailsTaskId):null;
   if(!t)return'<div class="det-no-task">No task selected.<br><br><button onclick="closeDetails()" style="margin-top:8px;padding:5px 14px;background:var(--blue);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">Back to Notes</button></div>';
   const col=TC[t.color||'blue']||TC.blue;
-  const startStr=unitToStr(t.startUnit);
-  const endStr=unitToStr(t.endUnit+1);
-  const timeStr=t.endUnit>t.startUnit?startStr+' \u2013 '+endStr:startStr;
+  const swatches=Object.keys(TC).map(k=>{
+    const act=k===(t.color||'blue');
+    return`<div onclick="detSetColor('${k}')" title="${k}" style="width:18px;height:18px;border-radius:50%;background:${TC[k].bg};border:2.5px solid ${act?TC[k].acc:'transparent'};cursor:pointer;flex-shrink:0;box-shadow:${act?'0 0 0 1.5px '+TC[k].acc:'none'}"></div>`;
+  }).join('');
+  let sOpts='',eOpts='';
+  for(let u=0;u<UNITS_TOTAL;u++)sOpts+=`<option value="${u}"${u===t.startUnit?' selected':''}>${unitToStr(u)}</option>`;
+  for(let u=0;u<=UNITS_TOTAL;u++)eOpts+=`<option value="${u}"${u===(t.endUnit+1)?' selected':''}>${unitToStr(u)}</option>`;
   return`<div class="det-hdr" style="background:${col.acc}">
     <span class="det-hdr-title">Task Details</span>
     <button class="det-close" onclick="closeDetails()" title="Back to Notes">&times;</button>
   </div>
   <div class="det-body" ondragenter="detBodyEnter(event,this)" ondragleave="detBodyLeave(event,this)" ondragover="event.preventDefault()" ondrop="detBodyDrop(event)">
-    <div class="det-label">Task</div>
-    <div class="det-task-title">${esc(t.text)||'<em style="opacity:.5">Untitled task</em>'}</div>
-    <div class="det-time">&#128337; ${timeStr}</div>
+    <div class="det-drop-overlay"><div class="drop-ov-icon">&#8679;</div><div class="drop-ov-text">Drop files here to attach</div></div>
+    <div class="det-label">Task name</div>
+    <div class="det-task-title" contenteditable="true"
+      style="outline:none;cursor:text;border-bottom:1.5px solid transparent;transition:border .12s;font-size:15px;font-weight:700;color:var(--navy);padding-bottom:2px;min-height:22px"
+      onfocus="this.style.borderBottomColor='#0078D4'"
+      onblur="detSaveName(this)"
+      onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${esc(t.text||'Untitled task')}</div>
+    <div style="display:flex;align-items:center;gap:8px;margin:10px 0 6px">
+      <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;color:var(--navy)">
+        <input type="checkbox" onchange="detToggleDone()"${t.done?' checked':''} style="width:15px;height:15px;accent-color:#0078D4;cursor:pointer">
+        <span>${t.done?'<s style="color:#95A8B8">Completed</s>':'Mark as complete'}</span>
+      </label>
+    </div>
+    <div class="det-label">Color</div>
+    <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">${swatches}</div>
     <div class="det-sep"></div>
-    <div class="det-label" style="margin-top:4px">Notes &amp; Details</div>
-    <textarea class="det-ta" id="det-ta" rows="6" placeholder="Add context, links, or additional notes for this task\u2026">${esc(t.details||'')}</textarea>
+    <div style="display:flex;gap:10px;margin:8px 0 10px">
+      <div style="flex:1"><div class="det-label">Start</div>
+        <select id="det-start-sel" onchange="detUpdateTime()" style="width:100%;padding:5px 6px;border:1.5px solid #DDE3E9;border-radius:6px;font-size:12px;outline:none;font-family:inherit;color:var(--navy)">${sOpts}</select>
+      </div>
+      <div style="flex:1"><div class="det-label">End</div>
+        <select id="det-end-sel" onchange="detUpdateTime()" style="width:100%;padding:5px 6px;border:1.5px solid #DDE3E9;border-radius:6px;font-size:12px;outline:none;font-family:inherit;color:var(--navy)">${eOpts}</select>
+      </div>
+    </div>
+    <div class="det-sep"></div>
+    <div class="det-label" style="margin-top:8px">Notes &amp; Details</div>
+    <textarea class="det-ta" id="det-ta" rows="4" placeholder="Add context, links, or notes\u2026">${esc(t.details||'')}</textarea>
   </div>`;
 }
 
@@ -2707,38 +2744,7 @@ function renderDBAttachments(rows, label){
 
 /* ── UPDATE buildDetailsPanelHTML TO INCLUDE ATTACHMENTS ── */
 /* This override runs after page load and replaces the function */
-function _buildDetailsWithAttachments(){
-  window._origBuildDetails=window.buildDetailsPanelHTML;
-  window.buildDetailsPanelHTML=function(){
-    var t=detailsTaskId?weekData[activeDay].tasks.find(function(x){return x.id===detailsTaskId;}):null;
-    if(!t)return'<div class="det-no-task">No task selected.<br><br><button onclick="closeDetails()" style="margin-top:8px;padding:5px 14px;background:var(--blue);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">Back to Notes</button></div>';
-    var col=TC[t.color||'blue']||TC.blue;
-    var startStr=unitToStr(t.startUnit),endStr=unitToStr(t.endUnit+1);
-    var timeStr=t.endUnit>t.startUnit?startStr+' \u2013 '+endStr:startStr;
-    var html='<div class="det-hdr" style="background:'+col.acc+'">'+
-      '<span class="det-hdr-title">Task Details</span>'+
-      '<button class="det-close" onclick="closeDetails()" title="Back to Notes">&times;</button>'+
-      '</div><div class="det-body"><div class="det-drop-overlay"><div class="drop-ov-icon">&#8679;</div><div class="drop-ov-text">Drop files here to attach</div></div>'+
-      '<div class="det-label">Task</div>'+
-      '<div class="det-task-title" contenteditable="true" onblur="detUpdateTaskName(event,\''+t.id+'\')" style="outline:none;cursor:text;border-bottom:1.5px solid transparent;transition:border .12s" onfocus="this.style.borderBottomColor=\'#0078D4\'" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}">'+esc(t.text||'Untitled task')+'</div>'+
-      '<div class="det-time">&#128337; '+timeStr+'</div>'+
-      '<div class="det-sep"></div>'+
-      '<div class="det-label" style="margin-top:4px">Notes &amp; Details</div>'+
-      '<textarea class="det-ta" id="det-ta" rows="5" placeholder="Add context, links, or notes\u2026">'+esc(t.details||'')+'</textarea>';
-    if(currentUser){
-      html+='<div class="det-sep"></div>'+
-        '<div class="det-label">Attachments</div>'+
-        '<div id="task-atts-'+t.id+'"><div style="font-size:12px;color:#95A8B8">Loading\u2026</div></div>'+
-        '<div class="task-att-drop" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ondrop="handleTaskFileDrop(event,\''+t.id+'\')">'
-        
-        +'<button class="att-add-btn" style="margin-top:2px" onclick="taskAddFile(\''+t.id+'\')" >&#128206; Add File</button>'
-        +'<button class="att-add-btn" style="margin-top:4px" onclick="taskAddImage(\''+t.id+'\')" >&#128247; Add Image / Photo</button>'
-        +'</div>';
-    }
-    html+='</div>';
-    return html;
-  };
-}
+
 
 
 
@@ -2779,11 +2785,22 @@ var _detDragCount=0;
 window.detBodyEnter=function(e,el){if(!el)return;e.preventDefault();_detDragCount++;el.classList.add('det-drop-active');};
 window.detBodyLeave=function(e,el){if(!el)return;_detDragCount=Math.max(0,_detDragCount-1);if(_detDragCount===0)el.classList.remove('det-drop-active');};
 
-window.detUpdateTaskName=function(e,tid){
+window.detUpdateTaskName=function(e){
   var newName=(e.target.innerText||'').trim();
   if(!newName)return;
-  var t=weekData[activeDay].tasks.find(function(x){return x.id===tid;});
+  var t=weekData[activeDay].tasks.find(function(x){return x.id===detailsTaskId;});
   if(t&&t.text!==newName){t.text=newName;scheduleSave();renderScheduleOnly();}
+};
+window.detSaveName=function(el){
+  var newName=(el.innerText||'').trim();
+  var t=weekData[activeDay].tasks.find(function(x){return x.id===detailsTaskId;});
+  if(!t)return;
+  if(!newName){
+    // Empty — restore previous name, don't delete task
+    el.innerText=t.text||'Untitled task';
+    return;
+  }
+  if(t.text!==newName){t.text=newName;scheduleSave();renderScheduleOnly();}
 };
 
 window.detBodyDrop=async function(e){
@@ -2921,7 +2938,84 @@ document.addEventListener('drop',async function(e){
 },true);
 
 /* ── INIT ── */
-_buildDetailsWithAttachments();
+
+/* ── Task Details helpers ── */
+function detUnitToTimeInput(unit){
+  var totalMins=4*60+30+unit*15;
+  var h=Math.floor(totalMins/60)%24;
+  var m=totalMins%60;
+  return(h<10?'0':'')+h+':'+(m<10?'0':'')+m;
+}
+function detTimeInputToUnit(val){
+  var parts=val.split(':');
+  var h=parseInt(parts[0]),m=parseInt(parts[1]);
+  var totalMins=h*60+m;
+  var baseMins=4*60+30;
+  return Math.max(0,Math.min(UNITS_TOTAL-1,Math.round((totalMins-baseMins)/15)));
+}
+window.detSetColor=function(color){
+  var t=weekData[activeDay].tasks.find(function(x){return x.id===detailsTaskId;});
+  if(!t)return;
+  t.color=color;
+  scheduleSave();
+  renderScheduleOnly(); // update task block color on timeline
+  // Update swatch borders in-place without re-rendering the whole panel
+  document.querySelectorAll('#right-panel [onclick^="detSetColor"]').forEach(function(el){
+    var k=el.getAttribute('title');
+    var active=(k===color);
+    el.style.border='2.5px solid '+(active?TC[k].acc:'transparent');
+    el.style.boxShadow=active?'0 0 0 1.5px '+TC[k].acc:'none';
+  });
+  // Update header color
+  var hdr=document.querySelector('.det-hdr');
+  if(hdr)hdr.style.background=TC[color]?TC[color].acc:'';
+};
+window.detToggleDone=function(){
+  var t=weekData[activeDay].tasks.find(function(x){return x.id===detailsTaskId;});
+  if(!t)return;
+  pushHistory();t.done=!t.done;scheduleSave();renderScheduleOnly();updateRightPanel();
+};
+window.detUpdateTime=function(){
+  var t=weekData[activeDay].tasks.find(function(x){return x.id===detailsTaskId;});
+  if(!t)return;
+  var ss=document.getElementById('det-start-sel');
+  var es=document.getElementById('det-end-sel');
+  if(!ss||!es)return;
+  var newStart=parseInt(ss.value);
+  var newEnd=parseInt(es.value)-1;
+  if(newEnd<newStart)newEnd=newStart;
+  pushHistory();t.startUnit=newStart;t.endUnit=newEnd;
+  scheduleSave();renderScheduleOnly();
+};
+
+window.detSaveName=function(el){
+  var newName=(el.innerText||'').trim();
+  var t=weekData[activeDay].tasks.find(function(x){return x.id===detailsTaskId;});
+  if(!t)return;
+  if(!newName){el.innerText=t.text||'Untitled task';return;}
+  if(t.text!==newName){t.text=newName;scheduleSave();renderScheduleOnly();}
+};
+window.detToggleDone=function(){
+  var t=weekData[activeDay].tasks.find(function(x){return x.id===detailsTaskId;});
+  if(!t)return;
+  pushHistory();t.done=!t.done;scheduleSave();renderScheduleOnly();updateRightPanel();
+};
+window.detSetColor=function(color){
+  var t=weekData[activeDay].tasks.find(function(x){return x.id===detailsTaskId;});
+  if(!t)return;
+  t.color=color;scheduleSave();renderScheduleOnly();updateRightPanel();
+};
+window.detUpdateTime=function(){
+  var t=weekData[activeDay].tasks.find(function(x){return x.id===detailsTaskId;});
+  if(!t)return;
+  var ss=document.getElementById('det-start-sel');
+  var es=document.getElementById('det-end-sel');
+  if(!ss||!es)return;
+  var ns=parseInt(ss.value),ne=parseInt(es.value)-1;
+  if(ne<ns)ne=ns;
+  pushHistory();t.startUnit=ns;t.endUnit=ne;scheduleSave();renderScheduleOnly();
+};
+
 initAuth();
 </script>
 
