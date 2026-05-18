@@ -712,14 +712,15 @@ function renderNotesBody(){
     return`<div class="note-block" data-nid="${n.id}">
       <div class="note-ctrl">
         <button class="npfx-icon${n.prefix!=='none'?' npa':''}" onmousedown="event.preventDefault()" onclick="openPfxMenu(event,'${n.id}')" title="List style">&#9776;</button>
+        <div style="width:1px;height:14px;background:var(--bd);margin:0 2px;flex-shrink:0"></div>
+        <button class="fmt-btn" data-cmd="bold" onmousedown="event.preventDefault();fmtExec('bold')" title="Bold (Ctrl+B)"><b>B</b></button>
+        <button class="fmt-btn" data-cmd="italic" onmousedown="event.preventDefault();fmtExec('italic')" title="Italic (Ctrl+I)"><i>I</i></button>
+        <button class="fmt-btn" data-cmd="underline" onmousedown="event.preventDefault();fmtExec('underline')" title="Underline (Ctrl+U)"><u>U</u></button>
+        <div style="flex:1"></div>
         <button class="note-del-btn" onmousedown="event.preventDefault()" onclick="noteDelete('${n.id}')">&times;</button>
       </div>
       <div class="note-ta-wrap">
-        <div style="display:flex;gap:2px;padding:3px 6px;border-bottom:1px solid var(--bd);background:var(--bg)">
-          <button class="fmt-btn" data-cmd="bold" onmousedown="event.preventDefault();fmtExec('bold')" title="Bold (Ctrl+B)"><b>B</b></button>
-          <button class="fmt-btn" data-cmd="italic" onmousedown="event.preventDefault();fmtExec('italic')" title="Italic (Ctrl+I)"><i>I</i></button>
-          <button class="fmt-btn" data-cmd="underline" onmousedown="event.preventDefault();fmtExec('underline')" title="Underline (Ctrl+U)"><u>U</u></button>
-        </div>
+
         <div class="note-ce" contenteditable="true" data-nid="${n.id}" placeholder="Type a note\u2026" >${n.text||''}</div>
       </div>
     </div>`;
@@ -1695,6 +1696,10 @@ document.addEventListener('mouseup',e=>{
       }
     }else{
       // Was a click → select
+      // Skip if user has text selected in the details panel (text drag release)
+      const sel=window.getSelection();
+      const rp=document.getElementById('right-panel');
+      if(sel&&sel.toString().length>0&&rp&&rp.contains(sel.anchorNode))return;
       const tid=_move.id;
       if(e.shiftKey){
         // Preserve any existing single selection when starting multi-select
