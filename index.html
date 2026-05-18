@@ -2830,9 +2830,13 @@ window.detBodyLeave=function(e,el){if(!el)return;_detDragCount=Math.max(0,_detDr
 
 window.detUpdateTaskName=function(e){
   var newName=(e.target.innerText||'').trim();
-  if(!newName)return;
   var t=weekData[activeDay].tasks.find(function(x){return x.id===detailsTaskId;});
-  if(t&&t.text!==newName){t.text=newName;scheduleSave();renderScheduleOnly();}
+  if(!t)return;
+  if(!newName){
+    e.target.innerText=t.text||'Untitled task';
+    return;
+  }
+  if(t.text!==newName){t.text=newName;scheduleSave();renderScheduleOnly();}
 };
 window.detSaveName=function(el){
   var newName=(el.innerText||'').trim();
