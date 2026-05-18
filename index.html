@@ -334,6 +334,23 @@ select.wb-sel option{background:#1D4A72;color:#fff}
 .db-editable:focus{background:#EFF5FB;border-radius:3px;outline:1px solid #0078D4}
 .db-table th{cursor:pointer}
 .db-table th:hover{background:#EEF4FB}
+
+/* Rich text formatting toolbar */
+.fmt-bar{display:flex;align-items:center;gap:2px;padding:3px 5px;border-bottom:1px solid var(--bd);background:var(--bg);flex-shrink:0}
+.fmt-btn{width:24px;height:22px;border:1px solid transparent;border-radius:3px;font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:var(--t2);display:flex;align-items:center;justify-content:center;transition:all .1s;font-family:serif}
+.fmt-btn:hover{background:var(--bgh);border-color:var(--bd);color:var(--navy)}
+.fmt-btn.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.fmt-btn[data-cmd="italic"]{font-style:italic}
+.fmt-btn[data-cmd="underline"]{text-decoration:underline}
+/* Replace note-ta with contenteditable */
+.note-ce{flex:1;background:transparent;border:none;outline:none;font-size:12px;line-height:1.65;color:var(--text);min-height:28px;width:0;word-break:break-word;white-space:pre-wrap}
+.note-ce:empty::before{content:attr(placeholder);color:var(--t3);pointer-events:none}
+/* Replace det-ta with contenteditable */
+.det-ce{width:100%;background:var(--bgp);border:1px solid var(--bd);outline:none;padding:9px;font-size:12px;line-height:1.65;min-height:80px;border-radius:0 0 6px 6px;color:var(--text);font-family:inherit;transition:border .12s;word-break:break-word;white-space:pre-wrap}
+.det-ce:empty::before{content:attr(placeholder);color:var(--t3);pointer-events:none}
+.det-ce:focus{border-color:#0078D4}
+.det-fmt-wrap{border:1px solid var(--bd);border-radius:6px;overflow:hidden;margin-top:0}
+.det-fmt-wrap .fmt-bar{border-bottom:1px solid var(--bd)}
 </style>
 </head>
 <body>
@@ -686,7 +703,7 @@ function renderNotesBody(){
   // preserve focused note + caret
   let fNid=null,fSs=0,fSe=0;
   const fa=document.activeElement;
-  if(fa&&fa.classList.contains('note-ta')){
+  if(fa&&(fa.classList.contains('note-ta')||fa.classList.contains('note-ce'))){
     const blk=fa.closest('[data-nid]');
     if(blk){fNid=blk.dataset.nid;fSs=fa.selectionStart;fSe=fa.selectionEnd;}
   }
@@ -697,12 +714,17 @@ function renderNotesBody(){
         <button class="npfx-icon${n.prefix!=='none'?' npa':''}" onmousedown="event.preventDefault()" onclick="openPfxMenu(event,'${n.id}')" title="List style">&#9776;</button>
         <button class="note-del-btn" onmousedown="event.preventDefault()" onclick="noteDelete('${n.id}')">&times;</button>
       </div>
-      <div class="note-ta-wrap">
-        <textarea class="note-ta" placeholder="Type a note\u2026">${esc(n.text)}</textarea>
+      <div class="note-ta-wrap" style="flex-direction:column;padding:0">
+        <div style="display:flex;gap:2px;padding:3px 6px;border-bottom:1px solid var(--bd);background:var(--bg)">
+          <button class="fmt-btn" data-cmd="bold" onmousedown="event.preventDefault();fmtExec('bold')" title="Bold (Ctrl+B)"><b>B</b></button>
+          <button class="fmt-btn" data-cmd="italic" onmousedown="event.preventDefault();fmtExec('italic')" title="Italic (Ctrl+I)"><i>I</i></button>
+          <button class="fmt-btn" data-cmd="underline" onmousedown="event.preventDefault();fmtExec('underline')" title="Underline (Ctrl+U)"><u>U</u></button>
+        </div>
+        <div class="note-ce" contenteditable="true" data-nid="${n.id}" placeholder="Type a note\u2026" style="padding:5px 8px;min-height:28px">${n.text||''}</div>
       </div>
     </div>`;
   }).join('')+`<button class="note-add-btn" onclick="noteAdd()">&#43; Add Note</button>`;
-  body.querySelectorAll('.note-ta').forEach(autoResize);
+  body.querySelectorAll('.note-ce').forEach(function(el){el.style.minHeight=el.scrollHeight+'px';});
   if(fNid){
     const ta=body.querySelector(`[data-nid="${fNid}"] .note-ta`);
     if(ta){ta.focus();try{ta.setSelectionRange(fSs,fSe);}catch(e){}}
@@ -1741,13 +1763,13 @@ document.addEventListener('input',e=>{
   }
   if(e.target.id==='det-ta'){
     const t=weekData[activeDay].tasks.find(x=>x.id===detailsTaskId);
-    if(t){t.details=e.target.value;scheduleSave();}
+    if(t){t.details=e.target.innerHTML||e.target.value||'';scheduleSave();}
   }
-  if(e.target.classList.contains('note-ta')){
+  if(e.target.classList.contains('note-ta')||e.target.classList.contains('note-ce')){
     const blk=e.target.closest('[data-nid]');
     if(blk){
       const n=weekData[activeDay].notes.find(x=>x.id===blk.dataset.nid);
-      if(n){n.text=e.target.value;autoResize(e.target);scheduleSave();}
+      if(n){n.text=e.target.innerHTML||e.target.value||'';scheduleSave();}
     }
   }
 });
@@ -1917,10 +1939,14 @@ function updateRightPanel(){
     if(ta){
       ta.addEventListener('input',function(){
         const t=weekData[activeDay].tasks.find(x=>x.id===detailsTaskId);
-        if(t){t.details=this.value;scheduleSave();}
-        autoResize(this);
+        if(t){
+          // Save innerHTML for rich text, fallback to innerText
+          t.details=ta.innerHTML||'';
+          scheduleSave();
+        }
       });
-      autoResize(ta);
+      ta.addEventListener('keyup',updateFmtBtns);
+      ta.addEventListener('mouseup',updateFmtBtns);
     }
     // Load attachments for this task
     if(detailsTaskId)setTimeout(function(){renderTaskAttachments(detailsTaskId);},50);
@@ -1985,7 +2011,10 @@ function buildDetailsPanelHTML(){
     </div>
     <div class="det-sep"></div>
     <div class="det-label" style="margin-top:8px">Notes &amp; Details</div>
-    <textarea class="det-ta" id="det-ta" rows="4" placeholder="Add context, links, or notes\u2026">${esc(t.details||'')}</textarea>
+    <div class="det-fmt-wrap">
+      ${fmtBarHTML('det-ce')}
+      <div class="det-ce" id="det-ta" contenteditable="true" placeholder="Add context, links, or notes…">${t.details||''}</div>
+    </div>
     ${attHtml}
   </div>`;
 }
@@ -3010,6 +3039,37 @@ window.detUpdateTime=function(){
   if(ne<ns)ne=ns;
   pushHistory();t.startUnit=ns;t.endUnit=ne;scheduleSave();renderScheduleOnly();
 };
+
+/* ── RICH TEXT FORMATTING ── */
+function fmtExec(cmd){
+  document.execCommand(cmd,false,null);
+  updateFmtBtns();
+}
+function updateFmtBtns(){
+  ['bold','italic','underline'].forEach(function(cmd){
+    var btns=document.querySelectorAll('.fmt-btn[data-cmd="'+cmd+'"]');
+    var active=document.queryCommandState(cmd);
+    btns.forEach(function(b){b.classList.toggle('active',active);});
+  });
+}
+function fmtBarHTML(targetId){
+  return'<div class="fmt-bar">'
+    +'<button class="fmt-btn" data-cmd="bold" onmousedown="event.preventDefault();fmtExec(\'bold\')" title="Bold (Ctrl+B)"><b>B</b></button>'
+    +'<button class="fmt-btn" data-cmd="italic" onmousedown="event.preventDefault();fmtExec(\'italic\')" title="Italic (Ctrl+I)"><i>I</i></button>'
+    +'<button class="fmt-btn" data-cmd="underline" onmousedown="event.preventDefault();fmtExec(\'underline\')" title="Underline (Ctrl+U)"><u>U</u></button>'
+    +'</div>';
+}
+// Intercept Ctrl+B/I/U in any contenteditable inside .det-body or .note-ta-wrap
+document.addEventListener('keydown',function(e){
+  if(!(e.ctrlKey||e.metaKey))return;
+  var ce=e.target;
+  if(!ce.isContentEditable)return;
+  if(e.key==='b'||e.key==='B'){e.preventDefault();fmtExec('bold');}
+  else if(e.key==='i'||e.key==='I'){e.preventDefault();fmtExec('italic');}
+  else if(e.key==='u'||e.key==='U'){e.preventDefault();fmtExec('underline');}
+});
+document.addEventListener('keyup',updateFmtBtns);
+document.addEventListener('mouseup',updateFmtBtns);
 
 initAuth();
 </script>
