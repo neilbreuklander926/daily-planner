@@ -216,8 +216,8 @@ select.wb-sel option{background:#1D4A72;color:#fff}
 .det-body{flex:1;overflow-y:auto;padding:12px}
 .det-chip{display:inline-flex;align-items:center;gap:5px;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 8px;font-size:11px;color:var(--t2);margin-bottom:10px;flex-shrink:0}
 .det-dot{width:10px;height:10px;border-radius:50%}
-.det-label{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
-.det-task-title{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:4px;line-height:1.3;word-break:break-word;cursor:text}
+.det-label{font-size:10px;font-weight:700;color:#95A8B8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif}
+.det-task-title{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:4px;line-height:1.3;word-break:break-word;cursor:text;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-smoothing:antialiased}
 .det-time{font-size:12px;color:var(--t2);font-family:'IBM Plex Mono',monospace;margin-bottom:14px}
 .det-sep{height:1px;background:var(--bd);margin:10px 0}
 .det-ta{width:100%;background:var(--bgp);border:1px solid var(--bd);outline:none;padding:9px;resize:none;font-size:12px;line-height:1.65;min-height:160px;border-radius:6px;color:var(--text);font-family:inherit;transition:border .12s}
@@ -1725,7 +1725,7 @@ document.addEventListener('click',e=>{
   if(del){const blk=del.closest('.task-block');if(blk){deleteTask(blk.dataset.tid);e.stopPropagation();return;}}
   const cb=e.target.closest('.tb-cb');
   if(cb){const blk=cb.closest('.task-block');if(blk){setTimeout(()=>toggleDone(blk.dataset.tid),0);return;}}
-  if(!e.target.closest('.task-block')&&!e.target.closest('#task-color-picker')&&!e.target.closest('#pfx-popup')){
+  if(!e.target.closest('.task-block')&&!e.target.closest('#task-color-picker')&&!e.target.closest('#pfx-popup')&&!e.target.closest('#right-panel')){
     exitEditMode();
     if(selectedTasks.size>0||selectedTaskId!=null){
       clearMultiSelect();selectedTaskId=null;
