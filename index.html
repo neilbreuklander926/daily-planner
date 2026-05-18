@@ -150,7 +150,7 @@ input,textarea{font-family:inherit;color:var(--text)}
 .npfx.npa{background:var(--blue);color:#fff}
 .note-del-btn{margin-left:auto;width:20px;height:20px;border-radius:3px;font-size:11px;color:var(--t3);display:flex;align-items:center;justify-content:center;border:none;background:transparent;cursor:pointer;transition:all .1s}
 .note-del-btn:hover{color:#c0392b;background:var(--bgh)}
-.note-ta-wrap{display:flex;align-items:flex-start;padding:5px 8px;gap:6px}
+.note-ta-wrap{display:flex;flex-direction:column;padding:0;gap:0}
 .note-ta{flex:1;background:transparent;border:none;outline:none;font-size:12px;line-height:1.65;resize:none;color:var(--text);min-height:28px;width:0}
 .note-ta::placeholder{color:var(--t3)}
 
@@ -343,10 +343,10 @@ select.wb-sel option{background:#1D4A72;color:#fff}
 .fmt-btn[data-cmd="italic"]{font-style:italic}
 .fmt-btn[data-cmd="underline"]{text-decoration:underline}
 /* Replace note-ta with contenteditable */
-.note-ce{flex:1;background:transparent;border:none;outline:none;font-size:12px;line-height:1.65;color:var(--text);min-height:28px;width:0;word-break:break-word;white-space:pre-wrap}
+.note-ce{flex:1;background:transparent;border:none;outline:none;font-size:12px;line-height:1.65;color:var(--text);min-height:28px;width:100%;word-break:break-word;white-space:normal;display:block;padding:5px 8px}
 .note-ce:empty::before{content:attr(placeholder);color:var(--t3);pointer-events:none}
 /* Replace det-ta with contenteditable */
-.det-ce{width:100%;background:var(--bgp);border:1px solid var(--bd);outline:none;padding:9px;font-size:12px;line-height:1.65;min-height:80px;border-radius:0 0 6px 6px;color:var(--text);font-family:inherit;transition:border .12s;word-break:break-word;white-space:pre-wrap}
+.det-ce{width:100%;background:var(--bgp);border:1px solid var(--bd);outline:none;padding:9px;font-size:12px;line-height:1.65;min-height:80px;border-radius:0 0 6px 6px;color:var(--text);font-family:inherit;transition:border .12s;word-break:break-word;white-space:normal;display:block}
 .det-ce:empty::before{content:attr(placeholder);color:var(--t3);pointer-events:none}
 .det-ce:focus{border-color:#0078D4}
 .det-fmt-wrap{border:1px solid var(--bd);border-radius:6px;overflow:hidden;margin-top:0}
@@ -714,13 +714,13 @@ function renderNotesBody(){
         <button class="npfx-icon${n.prefix!=='none'?' npa':''}" onmousedown="event.preventDefault()" onclick="openPfxMenu(event,'${n.id}')" title="List style">&#9776;</button>
         <button class="note-del-btn" onmousedown="event.preventDefault()" onclick="noteDelete('${n.id}')">&times;</button>
       </div>
-      <div class="note-ta-wrap" style="flex-direction:column;padding:0">
+      <div class="note-ta-wrap">
         <div style="display:flex;gap:2px;padding:3px 6px;border-bottom:1px solid var(--bd);background:var(--bg)">
           <button class="fmt-btn" data-cmd="bold" onmousedown="event.preventDefault();fmtExec('bold')" title="Bold (Ctrl+B)"><b>B</b></button>
           <button class="fmt-btn" data-cmd="italic" onmousedown="event.preventDefault();fmtExec('italic')" title="Italic (Ctrl+I)"><i>I</i></button>
           <button class="fmt-btn" data-cmd="underline" onmousedown="event.preventDefault();fmtExec('underline')" title="Underline (Ctrl+U)"><u>U</u></button>
         </div>
-        <div class="note-ce" contenteditable="true" data-nid="${n.id}" placeholder="Type a note\u2026" style="padding:5px 8px;min-height:28px">${n.text||''}</div>
+        <div class="note-ce" contenteditable="true" data-nid="${n.id}" placeholder="Type a note\u2026" >${n.text||''}</div>
       </div>
     </div>`;
   }).join('')+`<button class="note-add-btn" onclick="noteAdd()">&#43; Add Note</button>`;
@@ -1825,7 +1825,7 @@ document.addEventListener('keydown',e=>{
   // Delete task
   if((e.key==='Delete'||e.key==='Backspace')){
     const ae=document.activeElement;
-    if(ae instanceof HTMLTextAreaElement||ae instanceof HTMLInputElement)return;
+    if(ae instanceof HTMLTextAreaElement||ae instanceof HTMLInputElement||ae.isContentEditable)return;
     if(selectedTasks.size>0||(selectedTaskId&&!editingTaskId)){
       e.preventDefault();deleteSelected();return;
     }
