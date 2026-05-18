@@ -1936,7 +1936,7 @@ function updateRightPanel(){
     rp.innerHTML='<div class="notes-hdr">Notes</div><div class="notes-body" id="notes-body"></div>';
     renderNotesBody();
   var ar=document.getElementById('app-root');if(ar)ar.style.display='';
-  // Load day files once per day, not on every re-render
+  // Load day files once per day (not on every render)
   if(_dayFilesDay!==activeDay){
     _dayFilesDay=activeDay;
     setTimeout(function(){renderDayFiles(addDays(monday,activeDay));},120);
