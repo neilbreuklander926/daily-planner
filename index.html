@@ -1501,6 +1501,12 @@ document.addEventListener('mousedown',e=>{
 
     // Single click → select/move
     e.preventDefault();
+    // Clear any text selection in right-panel so it doesn't interfere with click handling
+    var _tsel=window.getSelection();
+    var _trp=document.getElementById('right-panel');
+    if(_tsel&&_tsel.toString().length>0&&_trp&&(_trp.contains(_tsel.anchorNode)||_trp.contains(_tsel.focusNode))){
+      _tsel.removeAllRanges();
+    }
     if(isAlreadyEditing)exitEditMode(); // clicking another area of same task exits edit
     const ae=document.activeElement;
     // Don't blur if we're about to drag the pending empty task
@@ -1699,7 +1705,11 @@ document.addEventListener('mouseup',e=>{
       // Skip if user has text selected in the details panel (text drag release)
       const sel=window.getSelection();
       const rp=document.getElementById('right-panel');
-      if(sel&&sel.toString().length>0&&rp&&rp.contains(sel.anchorNode))return;
+      if(sel&&sel.toString().length>0&&rp&&(rp.contains(sel.anchorNode)||rp.contains(sel.focusNode))){
+        // Clear move state so next mousemove doesn't start a drag
+        _move.id=null;_move.on=false;
+        return;
+      }
       const tid=_move.id;
       if(e.shiftKey){
         // Preserve any existing single selection when starting multi-select
@@ -1756,7 +1766,10 @@ document.addEventListener('click',e=>{
     // Don't deselect if user just released a text-drag that started in the details panel
     var _sel=window.getSelection();
     var _rp=document.getElementById('right-panel');
-    if(_sel&&_sel.toString().length>0&&_rp&&(_rp.contains(_sel.anchorNode)||_rp.contains(_sel.focusNode)))return;
+    if(_sel&&_sel.toString().length>0&&_rp&&(_rp.contains(_sel.anchorNode)||_rp.contains(_sel.focusNode))){
+      _sel.removeAllRanges(); // clear selection so next click works normally
+      return;
+    }
     exitEditMode();
     if(selectedTasks.size>0||selectedTaskId!=null){
       clearMultiSelect();selectedTaskId=null;
