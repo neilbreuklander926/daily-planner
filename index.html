@@ -2151,6 +2151,9 @@ function hookPendingBlur(taskId, inp){
       // Empty — only delete if textarea is not currently focused (re-render case)
       var cur=document.querySelector('[data-tid="'+taskId+'"] .tb-inp');
       if(cur&&document.activeElement===cur)return;
+      // Don't delete if user clicked into the task details panel for this task
+      var rp=document.getElementById('right-panel');
+      if(detailsTaskId===taskId&&rp&&rp.contains(document.activeElement))return;
       // Genuine click-away with no text
       weekData[activeDay].tasks=weekData[activeDay].tasks.filter(function(x){return x.id!==taskId;});
       if(selectedTaskId===taskId)selectedTaskId=null;
