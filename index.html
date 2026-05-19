@@ -1276,7 +1276,7 @@ function renderTaskBlocks(dayData){
       :('background:'+col.bg+';border-left-color:'+col.acc+';border-color:'+col.bd);
     var selCls=(isMSel?' sel':'')+(selectedTasks.has(t.id)?' multi-sel':'')+(isEditing?' editing':'');
     var parts=[];
-    parts.push('<div class="task-block'+(t.done?' done-blk':'')+(isMulti?' multi':'')+selCls+'" data-tid="'+t.id+'" data-col="'+lc+'" data-nc="'+nc+'" data-cs="'+cs+'" style="'+leftStyle+';top:'+top+'px;min-height:'+minH+'px;'+bgStyle+'">');
+    parts.push('<div class="task-block'+(t.done?' done-blk':'')+(isMulti?' multi':'')+selCls+'" data-tid="'+t.id+'" data-col="'+lc+'" data-nc="'+nc+'" data-cs="'+cs+'" style="'+leftStyle+';top:'+top+'px;height:'+minH+'px;overflow:hidden;'+bgStyle+'">');
     parts.push('<div class="tb-inner">');
     parts.push('<input type="checkbox" class="tb-cb" style="accent-color:'+col.acc+'"'+(t.done?' checked':'')+'>');
     parts.push('<textarea class="tb-inp'+(t.done?' done-txt':'')+'" rows="1" style="color:'+txtCol+'" placeholder="Add task\u2026">'+esc(t.text)+'</textarea>');
