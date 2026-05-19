@@ -2038,7 +2038,13 @@ function buildDetailsPanelHTML(){
     <div class="det-label">Color</div>
     <div id="det-swatches" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">${swatches}</div>
     <div class="det-sep"></div>
-    <div style="display:flex;gap:10px;margin:8px 0 10px">
+    <div style="margin:8px 0 8px">
+      <div class="det-label">Date</div>
+      <input type="date" id="det-date-inp" value="${addDays(monday,activeDay).toISOString().slice(0,10)}"
+        onchange="detMoveToDate(this.value)"
+        style="width:100%;padding:5px 6px;border:1.5px solid #DDE3E9;border-radius:6px;font-size:12px;outline:none;font-family:inherit;color:var(--navy)">
+    </div>
+    <div style="display:flex;gap:10px;margin:4px 0 10px">
       <div style="flex:1">
         <div class="det-label">Start</div>
         <select id="det-start-sel" onchange="detUpdateTime()" style="width:100%;padding:5px 6px;border:1.5px solid #DDE3E9;border-radius:6px;font-size:12px;outline:none;font-family:inherit;color:var(--navy)">${sOpts}</select>
@@ -3112,6 +3118,55 @@ document.addEventListener('keydown',function(e){
 });
 document.addEventListener('keyup',updateFmtBtns);
 document.addEventListener('mouseup',updateFmtBtns);
+
+window.detMoveToDate=function(newDateStr){
+  if(!detailsTaskId)return;
+  var t=weekData[activeDay].tasks.find(function(x){return x.id===detailsTaskId;});
+  if(!t)return;
+  // Parse the new target date
+  var newDate=new Date(newDateStr+'T00:00:00');
+  var curDate=addDays(monday,activeDay);
+  // Find which day index the new date corresponds to in the current week
+  var newDayIdx=-1;
+  for(var d=0;d<7;d++){
+    if(sameDay(addDays(monday,d),newDate)){newDayIdx=d;break;}
+  }
+  if(newDayIdx===activeDay)return; // same day, nothing to do
+  pushHistory();
+  if(newDayIdx>=0){
+    // Same week — move task to that day
+    var task=JSON.parse(JSON.stringify(t));
+    weekData[activeDay].tasks=weekData[activeDay].tasks.filter(function(x){return x.id!==detailsTaskId;});
+    if(!weekData[newDayIdx])weekData[newDayIdx]=emptyDay();
+    weekData[newDayIdx].tasks.push(task);
+    scheduleSave();
+    // Navigate to the new day and show the task details
+    activeDay=newDayIdx;
+    renderApp();
+    openDetails(task.id);
+  } else {
+    // Different week — need to navigate the week
+    var diffDays=Math.round((newDate-getMon(newDate))-(newDate.getDay()===0?6:newDate.getDay()-1)*86400000);
+    var newMonday=getMon(newDate);
+    var task2=JSON.parse(JSON.stringify(t));
+    weekData[activeDay].tasks=weekData[activeDay].tasks.filter(function(x){return x.id!==detailsTaskId;});
+    scheduleSave();
+    // Calculate the day index in the new week
+    var dow=newDate.getDay();
+    var newDIdx=dow===0?6:dow-1;
+    // Load the new week
+    monday=newMonday;
+    calMonth=new Date(newMonday.getFullYear(),newMonday.getMonth(),1);
+    loadWeek();
+    // After loadWeek, add the task to the correct day
+    if(!weekData[newDIdx])weekData[newDIdx]=emptyDay();
+    weekData[newDIdx].tasks.push(task2);
+    activeDay=newDIdx;
+    scheduleSave();
+    renderApp();
+    openDetails(task2.id);
+  }
+};
 
 initAuth();
 </script>
