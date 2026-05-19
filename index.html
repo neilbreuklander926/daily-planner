@@ -1450,6 +1450,7 @@ const MOVE_THRESH=6;
 let editingTaskId=null;
 let selectedTasks=new Set();
 let undoHistory=[],redoStack=[];
+let _clipboard=[]; // [{task snapshot}]
 let _pendingNewTaskId=null;
 let _lastClickTid=null,_lastClickTime=0;
 let _rubber={on:false,sx:0,sy:0,sxPx:0,syPx:0};
@@ -1852,10 +1853,16 @@ document.addEventListener('keydown',e=>{
     updateRightPanel();
     return;
   }
-  // Ctrl+Z/Y: undo/redo (non-whiteboard)
+  // Ctrl+Z/Y: undo/redo | Ctrl+C: copy | Ctrl+V: paste (non-whiteboard)
   if((e.ctrlKey||e.metaKey)&&!wbOpen){
     if(e.key==='z'&&!e.shiftKey){e.preventDefault();undo();return;}
     if(e.key==='y'||(e.key==='z'&&e.shiftKey)){e.preventDefault();redo();return;}
+    if(e.key==='c'&&!e.target.isContentEditable&&!(e.target instanceof HTMLInputElement)&&!(e.target instanceof HTMLTextAreaElement)){
+      e.preventDefault();copyTasks();return;
+    }
+    if(e.key==='v'&&!e.target.isContentEditable&&!(e.target instanceof HTMLInputElement)&&!(e.target instanceof HTMLTextAreaElement)){
+      e.preventDefault();pasteTasks();return;
+    }
   }
   // Task Enter = finalize (Shift+Enter = new line)
   if(e.key==='Enter'&&!e.shiftKey&&e.target.classList.contains('tb-inp')){
@@ -1966,7 +1973,7 @@ function updateRightPanel(){
     }).join('');
     rp.innerHTML=`<div class="msel-hdr">
       <span class="msel-title">${tasks.length} tasks selected</span>
-      <button class="msel-del" onclick="deleteSelected()">&#128465; Delete all</button>
+      <button class="msel-copy" onclick="copyTasks()" style="padding:4px 12px;background:#0078D4;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit">&#128203; Copy</button><button class="msel-del" onclick="deleteSelected()">&#128465; Delete all</button>
     </div>
     <div class="msel-body">${items}</div>
     <div class="msel-hint">Shift+click to add/remove &bull; Delete key to remove all</div>`;
@@ -2020,7 +2027,7 @@ function buildDetailsPanelHTML(){
   }
   return`<div class="det-hdr" style="background:${col.acc}">
     <span class="det-hdr-title">Task Details</span>
-    <button class="det-close" onclick="closeDetails()" title="Back to Notes">&times;</button>
+    <button onclick="copyTasks()" title="Copy task (Ctrl+C)" style="background:rgba(255,255,255,.2);border:none;color:#fff;font-size:11px;padding:3px 8px;border-radius:4px;cursor:pointer;font-family:inherit;margin-right:4px">&#128203; Copy</button><button class="det-close" onclick="closeDetails()" title="Back to Notes">&times;</button>
   </div>
   <div class="det-body">
     <div class="det-label">Task name</div>
@@ -3167,6 +3174,54 @@ window.detMoveToDate=function(newDateStr){
     openDetails(task2.id);
   }
 };
+
+/* ── COPY / PASTE TASKS ── */
+function copyTasks(){
+  var toCopy=[];
+  // Gather tasks to copy: multi-select first, then single
+  if(selectedTasks.size>0){
+    weekData[activeDay].tasks.forEach(function(t){
+      if(selectedTasks.has(t.id))toCopy.push(t);
+    });
+  } else if(selectedTaskId){
+    var t=weekData[activeDay].tasks.find(function(x){return x.id===selectedTaskId;});
+    if(t)toCopy.push(t);
+  }
+  if(!toCopy.length)return;
+  // Deep copy, sorted by startUnit
+  _clipboard=toCopy.sort(function(a,b){return a.startUnit-b.startUnit;}).map(function(t){
+    return JSON.parse(JSON.stringify(t));
+  });
+  // Flash save indicator
+  var el=document.getElementById('sst');
+  if(el){var prev=el.textContent;el.textContent=_clipboard.length+' task'+((_clipboard.length>1)?'s':'')+' copied';setTimeout(function(){el.textContent=prev;},1500);}
+}
+
+function pasteTasks(){
+  if(!_clipboard.length)return;
+  pushHistory();
+  var baseDate=addDays(monday,activeDay);
+  // Anchor: paste relative to the first task's start (or current time if crossing days)
+  // Keep all relative offsets between tasks intact
+  var firstStart=_clipboard[0].startUnit;
+  _clipboard.forEach(function(snap){
+    var newTask=JSON.parse(JSON.stringify(snap));
+    newTask.id=uid(); // new unique id
+    newTask.done=false; // reset completion on paste
+    // Keep same time slot (offset preserved)
+    // The task lands on activeDay
+    weekData[activeDay].tasks.push(newTask);
+  });
+  scheduleSave();
+  // Select the pasted tasks
+  selectedTasks.clear();
+  var pastedIds=weekData[activeDay].tasks.slice(-_clipboard.length).map(function(t){return t.id;});
+  pastedIds.forEach(function(id){selectedTasks.add(id);});
+  selectedTaskId=null;
+  renderScheduleOnly();
+  updateRightPanel();
+}
+
 
 initAuth();
 </script>
