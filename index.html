@@ -1587,10 +1587,17 @@ document.addEventListener('mousemove',e=>{
       const y=e.clientY-rect.top+sw.scrollTop;
       const ns=Math.max(0,Math.min(UNITS_TOTAL-1-_move.dur,Math.round(y/UNIT_H)-_move.off));
       _move.cur=ns;
-      // X column detection
+      // X column detection — recompute numCols dynamically at current time position
       const taskAreaW=rect.width-87;
       const xInArea=e.clientX-rect.left-83;
-      const nc=_move.numCols||1;
+      // Count overlapping tasks at current drag position (excluding dragged task)
+      var overlapCount=1;
+      weekData[activeDay].tasks.forEach(function(ot){
+        if(ot.id===_move.id)return;
+        if(ot.startUnit<=(_move.cur+_move.dur)&&ot.endUnit>=_move.cur)overlapCount++;
+      });
+      const nc=Math.min(3,Math.max(1,overlapCount));
+      _move.numCols=nc; // keep in sync for visual update
       const tc=Math.max(0,Math.min(nc-1,Math.floor(xInArea/(taskAreaW/nc))));
       _move.targetCol=tc;
       const blk=document.querySelector('[data-tid="'+_move.id+'"]');
