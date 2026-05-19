@@ -1767,8 +1767,7 @@ document.addEventListener('click',e=>{
     var _sel=window.getSelection();
     var _rp=document.getElementById('right-panel');
     if(_sel&&_sel.toString().length>0&&_rp&&(_rp.contains(_sel.anchorNode)||_rp.contains(_sel.focusNode))){
-      _sel.removeAllRanges(); // clear selection so next click works normally
-      return;
+      return; // keep text selected — it clears naturally on next intentional click
     }
     exitEditMode();
     if(selectedTasks.size>0||selectedTaskId!=null){
