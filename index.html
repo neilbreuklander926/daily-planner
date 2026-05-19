@@ -1234,14 +1234,25 @@ function computeTaskLayout(tasks){
 function swapCols(dragTid,targetCol){
   const t=weekData[activeDay].tasks.find(x=>x.id===dragTid);
   if(!t)return;
-  const prevCol=t.userCol||0;
-  if(targetCol===prevCol)return;
-  // swap overlapping tasks in targetCol back to prevCol
-  weekData[activeDay].tasks.forEach(o=>{
-    if(o.id===dragTid)return;
-    if((o.userCol||0)!==targetCol)return;
-    if(o.startUnit<=t.endUnit&&o.endUnit>=t.startUnit)o.userCol=prevCol;
+  // Get all tasks overlapping the dragged task's time range
+  const overlapping=weekData[activeDay].tasks.filter(o=>{
+    if(o.id===dragTid)return false;
+    return o.startUnit<=t.endUnit&&o.endUnit>=t.startUnit;
   });
+  if(!overlapping.length){t.userCol=targetCol;return;}
+  const nc=Math.min(3,overlapping.length+1);
+  // Get rendered column for each overlapping task using computeTaskLayout
+  const layout=computeTaskLayout(weekData[activeDay].tasks);
+  // Collect their current rendered cols (excluding dragged task)
+  const otherCols=overlapping.map(o=>(layout[o.id]||{col:0}).col);
+  // All columns 0..nc-1, remove targetCol — these go to the others in order
+  const remaining=[];
+  for(let i=0;i<nc;i++){if(i!==targetCol)remaining.push(i);}
+  // Sort others by their current rendered col so ordering is preserved
+  const sortedOthers=overlapping.slice().sort((a,b)=>{
+    return ((layout[a.id]||{col:0}).col)-((layout[b.id]||{col:0}).col);
+  });
+  sortedOthers.forEach((o,i)=>{o.userCol=remaining[i]!==undefined?remaining[i]:i;});
   t.userCol=targetCol;
 }
 
