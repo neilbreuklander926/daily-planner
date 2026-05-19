@@ -1753,6 +1753,10 @@ document.addEventListener('click',e=>{
   const cb=e.target.closest('.tb-cb');
   if(cb){const blk=cb.closest('.task-block');if(blk){setTimeout(()=>toggleDone(blk.dataset.tid),0);return;}}
   if(!e.target.closest('.task-block')&&!e.target.closest('#task-color-picker')&&!e.target.closest('#pfx-popup')&&!e.target.closest('#right-panel')){
+    // Don't deselect if user just released a text-drag that started in the details panel
+    var _sel=window.getSelection();
+    var _rp=document.getElementById('right-panel');
+    if(_sel&&_sel.toString().length>0&&_rp&&(_rp.contains(_sel.anchorNode)||_rp.contains(_sel.focusNode)))return;
     exitEditMode();
     if(selectedTasks.size>0||selectedTaskId!=null){
       clearMultiSelect();selectedTaskId=null;
