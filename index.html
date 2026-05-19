@@ -1973,7 +1973,7 @@ function updateRightPanel(){
     }).join('');
     rp.innerHTML=`<div class="msel-hdr">
       <span class="msel-title">${tasks.length} tasks selected</span>
-      <button class="msel-copy" onclick="copyTasks()" style="padding:4px 12px;background:#0078D4;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit">&#128203; Copy</button><button class="msel-del" onclick="deleteSelected()">&#128465; Delete all</button>
+      <button class="msel-copy" onclick="copyTasks()" style="padding:5px 12px;background:#0078D4;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:5px;transition:background .12s">&#128203; Copy</button><button class="msel-del" onclick="deleteSelected()">&#128465; Delete all</button>
     </div>
     <div class="msel-body">${items}</div>
     <div class="msel-hint">Shift+click to add/remove &bull; Delete key to remove all</div>`;
