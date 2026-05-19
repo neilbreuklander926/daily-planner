@@ -2059,7 +2059,7 @@ function enterEditMode(tid){
   if(blk){
     blk.classList.add('editing');
     const inp=blk.querySelector('.tb-inp');
-    if(inp){inp.style.pointerEvents='auto';setTimeout(()=>{inp.focus();},20);}
+    if(inp){inp.style.pointerEvents='auto';setTimeout(()=>{inp.focus();inp.setSelectionRange(inp.value.length,inp.value.length);},20);}
   }
 }
 function exitEditMode(){
