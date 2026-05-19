@@ -108,14 +108,14 @@ input,textarea{font-family:inherit;color:var(--text)}
 .cur-dot{position:absolute;width:8px;height:8px;background:var(--ntxt);border-radius:50%;z-index:10;pointer-events:none;margin-top:-3px;left:74px}
 
 /* TASK BLOCKS */
-.task-block{position:absolute;border-left-width:3px;border-left-style:solid;border-radius:3px;z-index:6;display:flex;flex-direction:column;overflow:visible;cursor:grab;user-select:none;transition:top .08s,left .08s,width .08s}
+.task-block{position:absolute;border-left-width:3px;border-left-style:solid;border-radius:3px;z-index:6;display:flex;flex-direction:column;overflow:hidden;cursor:grab;user-select:none;transition:top .08s,left .08s,width .08s}
 .task-block:hover{box-shadow:0 1px 8px rgba(0,0,0,.15)}
 .task-block.sel{box-shadow:0 2px 10px rgba(0,0,0,.2)}
 .task-block.done-blk{opacity:.5}
 .task-block.moving{opacity:.82;cursor:grabbing;z-index:20;box-shadow:0 4px 18px rgba(0,0,0,.2)}
 .tb-inner{flex:1;display:flex;align-items:flex-start;gap:5px;padding:4px 46px 4px 7px}
 .tb-cb{width:13px;height:13px;cursor:pointer;flex-shrink:0;margin-top:3px}
-.tb-inp{flex:1;background:transparent;border:none;outline:none;font-size:12px;line-height:1.45;resize:none;padding:0;min-height:16px;width:100%;overflow:hidden;cursor:text}
+.tb-inp{flex:1;background:transparent;border:none;outline:none;font-size:12px;line-height:1.45;resize:none;padding:0;min-height:16px;width:100%;overflow:hidden;cursor:text;word-break:break-word}
 .tb-inp::placeholder{color:rgba(70,100,130,.65)}
 .task-block.sel .tb-inp::placeholder{color:rgba(255,255,255,.8)}
 .tb-inp.done-txt{text-decoration:line-through;opacity:.6}
