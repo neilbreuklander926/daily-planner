@@ -240,7 +240,9 @@ select.wb-sel option{background:#1D4A72;color:#fff}
 /* Multi-select delete panel */
 .msel-hdr{padding:10px 13px;border-bottom:1px solid var(--bd);background:var(--bgp);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .msel-title{font-family:'Lora',serif;font-style:italic;font-size:14px}
-.msel-del{padding:5px 12px;background:#c4382a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:5px;transition:background .12s}
+.msel-del,.msel-copy{padding:5px 12px;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:5px;transition:background .12s}
+.msel-del{background:#c4382a}
+.msel-copy{background:#0078D4}
 .msel-del:hover{background:#a82a1e}
 .msel-body{flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:4px}
 .msel-item{display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bgp);border-radius:5px;border:1px solid var(--bd);font-size:12px}
@@ -1973,7 +1975,7 @@ function updateRightPanel(){
     }).join('');
     rp.innerHTML=`<div class="msel-hdr">
       <span class="msel-title">${tasks.length} tasks selected</span>
-      <button class="msel-copy" onclick="copyTasks()" style="padding:5px 12px;background:#0078D4;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:5px;transition:background .12s">&#128203; Copy</button><button class="msel-del" onclick="deleteSelected()">&#128465; Delete all</button>
+      <button class="msel-copy" onclick="copyTasks()">&#128203; Copy</button><button class="msel-del" onclick="deleteSelected()">&#128465; Delete all</button>
     </div>
     <div class="msel-body">${items}</div>
     <div class="msel-hint">Shift+click to add/remove &bull; Delete key to remove all</div>`;
