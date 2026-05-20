@@ -27,7 +27,7 @@ input,textarea{font-family:inherit;color:var(--text)}
 #app{padding:14px;height:100vh;display:flex;flex-direction:column;gap:10px}
 
 /* HEADER */
-.hdr{display:flex;align-items:center;justify-content:space-between;padding-bottom:12px;border-bottom:1.5px solid var(--bd2);flex-shrink:0}
+.hdr{position:relative;display:flex;align-items:center;justify-content:space-between;padding-bottom:12px;border-bottom:1.5px solid var(--bd2);flex-shrink:0}
 .hdr-title{font-family:'Lora',serif;font-size:20px;font-weight:500;color:var(--navy)}
 .wnav{display:flex;align-items:center;gap:4px}
 .wlbl{font-size:13px;color:var(--t2);min-width:182px;text-align:center;font-weight:500;padding:0 8px}
@@ -460,8 +460,12 @@ select.wb-sel option{background:#1D4A72;color:#fff}
 <script>
 /* ======== CONSTANTS ======== */
 const SLOT_H=36, UNIT_H=18, UNITS_TOTAL=76;
-const DL=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-const DS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+// DL/DS are now dynamic — use getDayNames() getters
+const _DL_BASE=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const _DS_BASE=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+// Proxy-like: DL[i] and DS[i] give the name of week-index i
+const DL=new Proxy([],{get:(t,k)=>{const ws=typeof _weekStart!=='undefined'?_weekStart:1;return _DL_BASE[(ws+parseInt(k))%7];}});
+const DS=new Proxy([],{get:(t,k)=>{const ws=typeof _weekStart!=='undefined'?_weekStart:1;return _DS_BASE[(ws+parseInt(k))%7];}});
 
 const ROWS=[];
 for(let i=0;i<38;i++){
@@ -488,7 +492,29 @@ const TC={
 const TC_KEYS=Object.keys(TC);
 
 /* ======== UTILS ======== */
-function getMon(d){const r=new Date(d);r.setHours(0,0,0,0);const dw=r.getDay();r.setDate(r.getDate()-(dw===0?6:dw-1));return r;}
+function getMon(d){return getWeekStart(d);}
+function getDayIdx(jsDay){
+  // jsDay: 0=Sun,1=Mon..6=Sat → returns 0-6 index from week start
+  const ws=typeof _weekStart!=='undefined'?_weekStart:1;
+  return(jsDay-ws+7)%7;
+}
+function getWeekDayNames(){
+  // Returns ordered [full,short] day names starting from _weekStart
+  const full=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const short=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const ws=typeof _weekStart!=='undefined'?_weekStart:1;
+  const fl=[],sl=[];
+  for(let i=0;i<7;i++){fl.push(full[(ws+i)%7]);sl.push(short[(ws+i)%7]);}
+  return{fl,sl};
+}
+function getWeekStart(d){
+  const r=new Date(d);r.setHours(0,0,0,0);
+  const dw=r.getDay(); // 0=Sun..6=Sat
+  const ws=typeof _weekStart!=='undefined'?_weekStart:1;
+  let diff=(dw-ws+7)%7;
+  r.setDate(r.getDate()-diff);
+  return r;
+}
 function addDays(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r;}
 function sameDay(a,b){return a.toDateString()===b.toDateString();}
 function fmt(d){return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}
@@ -499,8 +525,9 @@ function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').repla
 function autoResize(el){if(!el)return;el.style.height='auto';el.style.height=el.scrollHeight+'px';}
 
 /* ======== APP STATE ======== */
+var _weekStart=parseInt(localStorage.getItem('weekStart')||'1'); // 0=Sun,1=Mon,6=Sat
 let monday=getMon(new Date());
-let activeDay=(()=>{const d=new Date().getDay();return d===0?6:d-1;})();
+let activeDay=getDayIdx(new Date().getDay());
 let calMonth=new Date(new Date().getFullYear(),new Date().getMonth(),1);
 let weekData={};
 let saveStatus='saved',saveTimer=null;
@@ -515,7 +542,7 @@ function migrateNotes(raw){
   if(typeof raw==='string'&&raw.trim())return[{id:uid(),prefix:'none',text:raw}];
   return[];
 }
-function tdIdx(){const d=new Date().getDay();return d===0?6:d-1;}
+function tdIdx(){return getDayIdx(new Date().getDay());}
 function isTW(){return sameDay(monday,getMon(new Date()));}
 function getCurUnit(){
   if(!isTW()||activeDay!==tdIdx())return -1;
@@ -1340,14 +1367,16 @@ function renderSlotRows(){
 function renderCalendar(){
   const yr=calMonth.getFullYear(),mo=calMonth.getMonth();
   const first=new Date(yr,mo,1),last=new Date(yr,mo+1,0);
-  let so=first.getDay();so=so===0?6:so-1;
+  const ws=typeof _weekStart!=='undefined'?_weekStart:1;
+  let so=(first.getDay()-ws+7)%7;
   const start=addDays(first,-so);
-  let eo=last.getDay();eo=eo===0?0:7-eo;
+  let eo=(7-((last.getDay()-ws+7)%7+1))%7;
   const end=addDays(last,eo);
   const today=new Date();today.setHours(0,0,0,0);
   const selDate=addDays(monday,activeDay);selDate.setHours(0,0,0,0);
   const days=[];let cur=new Date(start);
   while(cur<=end){days.push(new Date(cur));cur=addDays(cur,1);}
+  const {sl:calShort}=getWeekDayNames();
   let html='';
   for(let w=0;w<days.length;w+=7){
     const wd=days.slice(w,w+7),wm=getMon(wd[0]);wm.setHours(0,0,0,0);
@@ -1364,7 +1393,7 @@ function renderCalendar(){
     <span class="cal-title">${fmtMon(calMonth)}</span>
     <button class="cal-nav" onclick="calNext()">\u203a</button>
   </div><div class="cal-body">
-    <div class="cal-dow"><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span><span>Su</span></div>
+    <div class="cal-dow">${calShort.map(d=>'<span>'+d+'</span>').join('')}</div>
     ${html}</div></div>`;
 }
 
@@ -1425,6 +1454,13 @@ function renderApp(){
       <div style="display:flex;align-items:center;gap:6px"><button id="undo-btn" class="ur-btn" onclick="undo()" disabled title="Undo (Ctrl+Z)">&#8617;</button><button id="redo-btn" class="ur-btn" onclick="redo()" disabled title="Redo (Ctrl+Y)">&#8618;</button>
         <div class="nav-sep"></div>
         <button class="db-open-btn" onclick="openDB()">&#128451; Library</button>
+        <button onclick="toggleWeekStartPicker()" title="Week start day" style="font-size:11px;padding:0 8px;height:26px;border:1px solid var(--bd);border-radius:5px;background:var(--bgp);color:var(--t2);cursor:pointer;font-family:inherit" id="ws-btn">&#128197; Week</button>
+        <div id="ws-picker" style="display:none;position:absolute;top:38px;right:10px;background:#fff;border:1px solid var(--bd);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:9999;padding:8px;min-width:160px">
+          <div style="font-size:10px;font-weight:700;color:#95A8B8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Week starts on</div>
+          <button class="ws-opt" onclick="setWeekStart(0)" style="display:block;width:100%;text-align:left;padding:5px 8px;border:none;background:none;cursor:pointer;font-size:13px;border-radius:4px">Sunday</button>
+          <button class="ws-opt" onclick="setWeekStart(1)" style="display:block;width:100%;text-align:left;padding:5px 8px;border:none;background:none;cursor:pointer;font-size:13px;border-radius:4px">Monday</button>
+          <button class="ws-opt" onclick="setWeekStart(6)" style="display:block;width:100%;text-align:left;padding:5px 8px;border:none;background:none;cursor:pointer;font-size:13px;border-radius:4px">Saturday</button>
+        </div>
         <button onclick="doSignOut()" class="nbtn" style="font-size:11px;padding:0 10px;min-width:68px">Sign out</button>
         <span id="sst" class="sst sav" style="font-size:11px;white-space:nowrap">\\u2713 Saved</span>
       </div>
@@ -1932,7 +1968,7 @@ window.calPrev=()=>{calMonth=new Date(calMonth.getFullYear(),calMonth.getMonth()
 window.calNext=()=>{calMonth=new Date(calMonth.getFullYear(),calMonth.getMonth()+1,1);const l=document.querySelector('.left');if(l)l.innerHTML=renderCalendar()+renderDayTabs()+renderWBSection();};
 window.calDay=ds=>{
   const d=new Date(ds+'T00:00:00');
-  monday=getMon(d);activeDay=(()=>{const dw=d.getDay();return dw===0?6:dw-1;})();
+  monday=getMon(d);activeDay=getDayIdx(d.getDay());
   calMonth=new Date(d.getFullYear(),d.getMonth(),1);loadWeek();
 };
 window.openWhiteboard=openWhiteboard;
@@ -3163,8 +3199,7 @@ window.detMoveToDate=function(newDateStr){
     weekData[activeDay].tasks=weekData[activeDay].tasks.filter(function(x){return x.id!==detailsTaskId;});
     scheduleSave();
     // Calculate the day index in the new week
-    var dow=newDate.getDay();
-    var newDIdx=dow===0?6:dow-1;
+    var newDIdx=getDayIdx(newDate.getDay());
     // Load the new week
     monday=newMonday;
     calMonth=new Date(newMonday.getFullYear(),newMonday.getMonth(),1);
@@ -3226,6 +3261,42 @@ function pasteTasks(){
   updateRightPanel();
 }
 
+
+window.toggleWeekStartPicker=function(){
+  var p=document.getElementById('ws-picker');
+  if(p)p.style.display=p.style.display==='none'?'block':'none';
+  updateWeekStartUI();
+};
+window.setWeekStart=function(ws){
+  _weekStart=ws;
+  localStorage.setItem('weekStart',ws);
+  var p=document.getElementById('ws-picker');
+  if(p)p.style.display='none';
+  // Recalculate monday/activeDay for current date context
+  monday=getMon(addDays(monday,activeDay));
+  activeDay=getDayIdx(addDays(monday,0).getDay()); // stays on same calendar date
+  // Actually recalc from the selected date
+  var curDate=addDays(monday,activeDay);
+  monday=getMon(curDate);
+  activeDay=getDayIdx(curDate.getDay());
+  loadWeek();
+};
+function updateWeekStartUI(){
+  var opts=document.querySelectorAll('.ws-opt');
+  var labels=['Sunday','Monday','Saturday'];
+  var vals=[0,1,6];
+  opts.forEach(function(btn,i){
+    btn.style.background=_weekStart===vals[i]?'#EFF5FB':'';
+    btn.style.fontWeight=_weekStart===vals[i]?'700':'400';
+  });
+}
+// Close picker when clicking outside
+document.addEventListener('click',function(e){
+  if(!e.target.closest('#ws-btn')&&!e.target.closest('#ws-picker')){
+    var p=document.getElementById('ws-picker');
+    if(p)p.style.display='none';
+  }
+});
 
 initAuth();
 </script>
